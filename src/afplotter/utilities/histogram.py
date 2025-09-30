@@ -1,0 +1,330 @@
+from collections import defaultdict
+import numpy as np  # type: ignore
+from typing import Any, Dict, List, Optional, Union, Tuple
+from dataclasses import dataclass, field, asdict
+
+
+@dataclass
+class HistogramEntry:
+    name: str = ""
+    latex_name: str = ""
+    array: Optional[np.ndarray] = None
+    counts: np.ndarray = field(default_factory=lambda: np.array([]))
+    errors: np.ndarray = field(default_factory=lambda: np.array([]))
+    weight: Union[float, np.ndarray] = 1.0
+    color: Optional[str] = None
+    hatch: Optional[str] = None
+    show_label: bool = True
+    type: str = "entry"
+
+    def __add__(self, other: "HistogramEntry") -> "HistogramEntry":
+        if len(self.counts) != len(other.counts):
+            raise ValueError(
+                f"The two HistogramEntries {self.name} and {other.name}"
+                "have different binns. They cannot be added."
+            )
+        return HistogramEntry(
+            counts=self.counts + other.counts,
+            errors=np.sqrt(self.errors**2 + other.errors**2),
+        )
+
+    def __iadd__(self, other: "HistogramEntry") -> "HistogramEntry":
+        if len(self.counts) == 0:
+            self.counts = other.counts
+            self.errors = other.errors
+        elif len(self.counts) == len(other.counts):
+            self.counts += other.counts
+            self.errors = np.sqrt(self.errors**2 + other.errors**2)
+        else:
+            raise ValueError(
+                f"The two HistogramEntries {self.name} and {other.name}"
+                "have different binns. They cannot be added."
+            )
+        self.clear_array()
+        return self
+
+    @property
+    def as_dict(self) -> Dict[str, Any]:
+        """Converts the instance to a serializable dictionary."""
+        data = asdict(self)  # Convert to dictionary
+        # Convert numpy arrays to lists
+        for key in ["array", "counts", "errors"]:
+            if isinstance(data[key], np.ndarray):
+                data[key] = data[key].tolist()
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "HistogramEntry":
+        """Creates an instance from a dictionary."""
+        # Convert lists back to numpy arrays
+        for key in ["array", "counts", "errors"]:
+            if data.get(key) is not None:
+                data[key] = np.array(data[key])
+        return cls(**data)
+
+    def get_weights(self, pot: float = 1.0) -> np.ndarray:
+        return np.ones_like(self.array) * self.weight**pot
+
+    def compute_counts(self, binning: Union[np.ndarray, int]) -> np.ndarray:
+        assert self.array is not None, (
+            f"The array for the HistogramEntry {self.name} is not set."
+            + "Either this method was called too early or the array was already cleared."
+        )
+        self.counts, edges = np.histogram(
+            self.array, bins=binning, weights=self.get_weights()
+        )
+        return edges
+
+    def compute_errors(self, binning: np.ndarray) -> None:
+        if self.array is not None:
+            bin_errors_squared, _ = np.histogram(
+                self.array,
+                bins=binning,
+                weights=self.get_weights(pot=2.0),
+            )
+            self.errors = np.sqrt(bin_errors_squared)
+        else:
+            self.errors = np.sqrt(self.counts)
+
+    def clear_array(self) -> None:
+        self.array = None
+
+
+class Histogram:
+    def __init__(self) -> None:
+        self._binning: Optional[Union[np.ndarray, int]] = None
+        self.entries: Dict[str, HistogramEntry] = defaultdict(lambda: HistogramEntry())
+        self.signal: Dict[str, HistogramEntry] = defaultdict(lambda: HistogramEntry())
+        self.metadata: Dict[Any, Any] = {}
+
+    @property
+    def as_dict(self) -> Dict[str, Any]:
+        binning = (
+            self.binning
+            if isinstance(self.binning, int)
+            else self.binning.tolist()
+            if self.binning is not None
+            else None
+        )
+        data = {
+            "binning": binning,
+            "metadata": self.metadata,
+            "entries": {name: entry.as_dict for name, entry in self.entries.items()},
+            "signal": {name: entry.as_dict for name, entry in self.signal.items()},
+        }
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Histogram":
+        instance = cls()
+        instance.binning = (
+            np.array(data["binning"]) if data["binning"] is not None else None
+        )
+        instance.metadata = data["metadata"]
+        instance.entries = {
+            name: HistogramEntry.from_dict(entry_data)
+            for name, entry_data in data["entries"].items()
+        }
+        instance.signal = {
+            name: HistogramEntry.from_dict(entry_data)
+            for name, entry_data in data["signal"].items()
+        }
+        return instance
+
+    @property
+    def binning(self) -> Optional[Union[np.ndarray, int]]:
+        return self._binning
+
+    @binning.setter
+    def binning(self, bins: Union[np.ndarray, int]) -> None:
+        self._binning = bins
+
+    @property
+    def column_name(self) -> str:
+        return self.metadata.get("column_name", "")
+
+    @property
+    def filters(self) -> List[Any]:
+        return self.metadata.get("filters", [])
+
+    def add_entry(self, entry: HistogramEntry, clear: bool = False) -> None:
+        if self.binning is None:
+            raise ValueError("Binning not set")
+
+        if len(entry.counts) == 0:
+            edges = entry.compute_counts(binning=self.binning)
+            if isinstance(self.binning, int):
+                self.binning = edges
+
+        entry.compute_errors(binning=self.binning)
+
+        if clear:
+            entry.clear_array()
+
+        if entry.type == "entry":
+            self.entries[entry.name] = entry
+        elif entry.type == "signal":
+            self.signal[entry.name] = entry
+        else:
+            raise ValueError("Entry type not recognized")
+
+    def get_entry(self, name: str) -> HistogramEntry:
+        return self.entries[name]
+
+    def remove_entry(self, name: str) -> None:
+        if name in self.entries:
+            del self.entries[name]
+        else:
+            raise KeyError(f"Entry '{name}' not found in histogram.")
+
+    def sum_entries(
+        self,
+        entries: List[str],
+        name: str = "",
+        latex_name: str = "",
+        color: Optional[str] = None,
+        hatch: Optional[str] = None,
+        type: str = "entry",
+    ) -> None:
+        new_entry = HistogramEntry(
+            name=name, latex_name=latex_name, color=color, hatch=hatch, type=type
+        )
+        try:
+            for entry_name in entries:
+                new_entry += self.get_entry(entry_name)
+
+            self.add_entry(new_entry)
+        finally:
+            for entry_name in entries:
+                self.remove_entry(entry_name)
+
+    def get_data(self) -> List[Optional[np.ndarray]]:
+        return list(entry.array for entry in self.entries.values())
+
+    def get_signal_data(self) -> List[Optional[np.ndarray]]:
+        return list(entry.array for entry in self.signal.values())
+
+    def get_names(self) -> List[str]:
+        return list(entry.name for entry in self.entries.values())
+
+    def get_latex_names(self) -> Optional[List[str]]:
+        if any(not entry.show_label for entry in self.entries.values()):
+            return None
+        else:
+            return list(
+                entry.latex_name if entry.latex_name else entry.name
+                for entry in self.entries.values()
+            )
+
+    def get_signal_names(self) -> List[str]:
+        return list(entry.name for entry in self.signal.values())
+
+    def get_signal_latex_names(self) -> List[str]:
+        return list(
+            entry.latex_name if entry.latex_name else entry.name
+            for entry in self.signal.values()
+        )
+
+    def get_colors(self) -> List[Optional[str]]:
+        return list(entry.color for entry in self.entries.values())
+
+    def get_signal_colors(self) -> List[Optional[str]]:
+        return list(entry.color for entry in self.signal.values())
+
+    def get_hatches(self) -> List[Optional[str]]:
+        return list(entry.hatch for entry in self.entries.values())
+
+    def get_bin_centers(self) -> List[np.ndarray]:
+        assert not isinstance(self.binning, int)
+        assert self.binning is not None
+
+        bin_mids = [
+            (self.binning[i] + self.binning[i + 1]) / 2
+            for i in range(0, len(self.binning) - 1)
+        ]
+        entries = self.entries if self.entries else self.signal
+        return [np.array(bin_mids) for _ in entries]
+
+    def get_bin_width(self) -> float:
+        assert not isinstance(self.binning, int)
+        assert self.binning is not None
+
+        return self.binning[1] - self.binning[0]
+
+    def get_bin_count_for_entry(self, entry: HistogramEntry) -> np.ndarray:
+        return entry.counts
+
+    def get_bin_counts(self) -> List[np.ndarray]:
+        return [self.get_bin_count_for_entry(entry) for entry in self.entries.values()]
+
+    def get_total_bin_count(self) -> np.ndarray:
+        return np.sum(self.get_bin_counts(), axis=0)
+
+    def get_total_scale(self) -> float:
+        return float(np.sum(self.get_total_bin_count() * self.get_bin_width()))
+
+    def get_bin_error_for_entry(self, entry: HistogramEntry) -> np.ndarray:
+        return entry.errors
+
+    def get_bin_errors(self) -> List[np.ndarray]:
+        return [
+            self.get_bin_error_for_entry(entry=entry) for entry in self.entries.values()
+        ]
+
+    def get_total_bin_errors(self) -> np.ndarray:
+        return np.sqrt(
+            np.sum(
+                [
+                    self.get_bin_error_for_entry(entry=entry) ** 2
+                    for entry in self.entries.values()
+                ],
+                axis=0,
+            )
+        )
+
+    def get_signal_bin_count_for_component(
+        self, entry: HistogramEntry
+    ) -> Tuple[np.ndarray, float]:
+        bin_count = self.get_bin_count_for_entry(entry=entry).astype(float)
+        scaling = 1
+        if self.entries:
+            max_bin_count = np.max(bin_count)
+            max_bin_counts = np.max(np.sum(self.get_bin_counts(), axis=0))
+            scaling = max_bin_counts / max_bin_count if max_bin_count != 0 else 1
+
+        bin_count *= scaling
+
+        return bin_count, scaling
+
+    def get_signal_bin_counts(self) -> List[np.ndarray]:
+        signal_bin_counts = []  # type: List[np.ndarray]
+        for entry in self.signal.values():
+            bin_count, _ = self.get_signal_bin_count_for_component(entry=entry)
+            signal_bin_counts.append(bin_count)
+        return signal_bin_counts
+
+    def get_total_signal_bin_count(self) -> np.ndarray:
+        return np.sum(self.get_signal_bin_counts(), axis=0)
+
+    def get_total_signal_scale(self) -> float:
+        return float(np.sum(self.get_total_signal_bin_count() * self.get_bin_width()))
+
+    def get_signal_bin_error_for_entry(self, entry: HistogramEntry) -> np.ndarray:
+        _, scaling = self.get_signal_bin_count_for_component(entry=entry)
+        return scaling * self.get_bin_error_for_entry(entry=entry)
+
+    def get_signal_bin_errors(self) -> List[np.ndarray]:
+        return [
+            self.get_signal_bin_error_for_entry(entry=entry)
+            for entry in self.signal.values()
+        ]
+
+    def get_scale(self) -> float:
+        return np.max([self.get_total_scale(), self.get_total_signal_scale()])
+
+    def order_entries(self, entry_name: List[str]) -> None:
+        if len(entry_name) != len(self.entries):
+            raise ValueError(
+                "The number of entries to order does not match the number of entries."
+            )
+        self.entries = {name: self.entries[name] for name in entry_name}
