@@ -9,9 +9,7 @@ import polars as pl
 import numpy as np
 
 from afplotter.utilities.histogram import Histogram, HistogramEntry
-from alpstrahlung.utilities.selections import (
-    SelectionParser,
-)  # make sure this import is present
+from afplotter.selectionparser.polars import SelectionParser
 
 
 class LazyHistEntry(HistogramEntry):
