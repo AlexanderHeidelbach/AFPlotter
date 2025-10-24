@@ -1,0 +1,50 @@
+[project]
+name = "afplotter"
+version = "0.0.1"
+description = "A package for plotting and data analysis in HEP"
+authors = [
+    {name = "Alexander Heidelbach",email = "alexander.heidelbach@kit.edu"},
+    {name = "Frederik Schmitt",email = "schmittfrederik@proton.me"},
+]
+dependencies = [
+    "polars",
+    "seaborn",
+    "b2luigi",
+    "ruff",
+    "mypy",
+    "scikit-learn",
+    "pre-commit",
+    "kafe2",
+    "icecream",
+    "charset-normalizer==3.4.2",
+    "jupyter",
+    "importlib_resources"
+]
+requires-python = ">=3.8,<3.12"
+readme = "README.md"
+license = {text = "MIT"}
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "pluggy", "iniconfig"]
+
+[tool.pdm]
+distribution = true
+
+[tool.ruff]
+lint.ignore = ["E402"]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = ["F401", "F403", "E402"]
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"afplotter.styles" = ["*.mplstyle"]
