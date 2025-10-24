@@ -4,11 +4,14 @@ import numpy as np
 from abc import ABC
 from cycler import cycler
 import matplotlib.pyplot as plt
+from importlib_resources import files  # works on 3.8+
 
 PathType = Union[str, os.PathLike]
 
-style = os.path.join(os.environ.get("ALPS_PATH", ""), "belle2_modern.mplstyle")
-plt.style.use(style)
+# style = os.path.join(os.environ.get("ALPS_PATH", ""), "belle2_modern.mplstyle")
+# plt.style.use(style)
+style_path = files("afplotter.styles") / "belle2_modern.mplstyle"
+plt.style.use(style_path)
 
 
 class KITColors:
