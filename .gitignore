@@ -12,3 +12,5 @@ venv/
 ENV/
 venv*
 env*
+
+00_Notebooks/
