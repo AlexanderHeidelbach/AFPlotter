@@ -1,1 +1,1 @@
-from . import baseplotter, genericplot, histogramplot, selectionparser, utilities, styles
+from . import baseplotter, genericplot, histogramplot, selectionparser, utilities, experiments
