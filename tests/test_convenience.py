@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 import pytest
@@ -16,8 +17,8 @@ def two_entry_arrays():
 
 def test_plot_histogram_returns_axes_with_content(two_entry_arrays):
     ax = plot_histogram(two_entry_arrays, bins=(0, 10, 21), xlabel="pt", save=False)
-    assert ax is not None
-    plt.close(ax.figure) if (plt := __import__("matplotlib.pyplot", fromlist=["pyplot"])) else None
+    assert len(ax.patches) > 0 or len(ax.containers) > 0
+    plt.close(ax.figure)
 
 
 def test_plot_histogram_saves_to_explicit_path(two_entry_arrays, tmp_path):
