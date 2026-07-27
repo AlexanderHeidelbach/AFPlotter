@@ -94,6 +94,10 @@ def test_generic_plotter_add_inset_with_explicit_plots_and_ylim():
     ax = plotter.plot(save=False)
     inset_ax = ax.figure.axes[1]
     assert len(inset_ax.lines) == 1
+    # The explicit `plots=` override must be honored, not silently fall back
+    # to the main plotter's own queued plots — check the actual rendered
+    # data, not just the line count (both lists produce exactly one line).
+    assert list(inset_ax.lines[0].get_ydata()) == [2, 1, 0]
     assert inset_ax.get_ylim() == (0.0, 2.0)
     plt.close(ax.figure)
 
