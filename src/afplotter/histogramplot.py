@@ -6,7 +6,7 @@ import numpy as np  # type: ignore
 import seaborn as sns  # type: ignore
 
 from afplotter.baseplotter import BasePlotter
-from afplotter.genericplot import GenericPlot
+from afplotter.genericplot import GenericPlot, InsetPlot
 from afplotter.utilities.histogram import Histogram
 
 
@@ -482,6 +482,7 @@ class HistogramPlotter(BasePlotter):
         self.histplot = histplot
         self.variable = variable
         self.generic_plots: List[GenericPlot] = []
+        self._insets: List[InsetPlot] = []
         self.pull_plots: List[GenericPlot] = []
         self.pull_ylim: Optional[Tuple[float, float]] = None
         self.color_map_kwargs: Dict[str, Any] = {}
@@ -532,6 +533,31 @@ class HistogramPlotter(BasePlotter):
 
     def add_generic_plot(self, generic_plot: GenericPlot) -> None:
         self.generic_plots.append(generic_plot)
+
+    def add_inset(
+        self,
+        xlim: Tuple[float, float],
+        ylim: Optional[Tuple[float, float]] = None,
+        plots: Optional[List[Any]] = None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Queue an inset axes replaying this plotter's histogram (and any
+        generic overlays) zoomed to xlim/ylim.
+
+        :param xlim: Data x-limits for the inset.
+        :param ylim: Optional data y-limits for the inset.
+        :param plots: Objects to replay in the inset (must expose an `ax`
+            setter and a no-argument `plot()`, as both HistogramPlot and
+            GenericPlot do); defaults to this plotter's histogram plus any
+            generic overlays.
+        :param kwargs: Forwarded to InsetPlot (width, height, loc, title,
+            mark_region, mark_kwargs, tick_labelsize, title_fontsize, bbox_to_anchor).
+        :return: None
+        """
+        if plots is None:
+            plots = [self.histplot] + list(self.generic_plots)
+        self._insets.append(InsetPlot(plots=plots, xlim=xlim, ylim=ylim, **kwargs))
 
     def add_pull(
         self,
@@ -801,6 +827,9 @@ class HistogramPlotter(BasePlotter):
         for generic_plot in self.generic_plots:
             generic_plot.ax = ax
             ax = generic_plot.plot()
+
+        for inset in self._insets:
+            inset.plot(parent_ax=ax)
 
         self.xlim = (
             np.min(self.histplot.histogram.binning),

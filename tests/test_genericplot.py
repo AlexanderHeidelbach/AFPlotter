@@ -71,3 +71,46 @@ def test_generic_plotter_multiple_plots_share_one_axes():
     ax = plotter.plot(save=False)
     assert len(ax.lines) == 2
     plt.close(ax.figure)
+
+
+def test_generic_plotter_add_inset_default_plots_and_render():
+    plotter = GenericPlotter()
+    plotter.add_generic_plot("plot", [0, 1, 2, 3], [0, 1, 4, 9], label="curve")
+    plotter.add_inset(xlim=(0, 1), title="Zoom")
+    ax = plotter.plot(save=False)
+    assert len(ax.figure.axes) == 2
+    inset_ax = ax.figure.axes[1]
+    assert len(inset_ax.lines) == 1
+    assert inset_ax.get_title() == "Zoom"
+    assert inset_ax.get_xlim() == (0.0, 1.0)
+    plt.close(ax.figure)
+
+
+def test_generic_plotter_add_inset_with_explicit_plots_and_ylim():
+    plotter = GenericPlotter()
+    plotter.add_generic_plot("plot", [0, 1, 2], [0, 1, 2], label="main")
+    inset_only_plot = GenericPlot("plot", [0, 1, 2], [2, 1, 0], label="inset-only")
+    plotter.add_inset(xlim=(0, 2), ylim=(0, 2), plots=[inset_only_plot])
+    ax = plotter.plot(save=False)
+    inset_ax = ax.figure.axes[1]
+    assert len(inset_ax.lines) == 1
+    assert inset_ax.get_ylim() == (0.0, 2.0)
+    plt.close(ax.figure)
+
+
+def test_generic_plotter_add_inset_mark_region_false_still_renders():
+    plotter = GenericPlotter()
+    plotter.add_generic_plot("plot", [0, 1], [0, 1])
+    plotter.add_inset(xlim=(0, 1), mark_region=False)
+    ax = plotter.plot(save=False)
+    assert len(ax.figure.axes) == 2
+    plt.close(ax.figure)
+
+
+def test_generic_plotter_add_inset_bbox_to_anchor_positioning():
+    plotter = GenericPlotter()
+    plotter.add_generic_plot("plot", [0, 1], [0, 1])
+    plotter.add_inset(xlim=(0, 1), bbox_to_anchor=(0.5, 0.5, 0.3, 0.3), width="100%", height="100%")
+    ax = plotter.plot(save=False)
+    assert len(ax.figure.axes) == 2
+    plt.close(ax.figure)

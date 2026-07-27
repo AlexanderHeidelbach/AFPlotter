@@ -111,6 +111,18 @@ def test_histogram_plotter_add_function_and_pull(synthetic_histogram):
     plt.close(ax.figure)
 
 
+def test_histogram_plotter_add_inset_default_plots(synthetic_histogram):
+    histplot = HistogramPlot(synthetic_histogram)
+    histplot.stacked = True
+    variable = HistogramVariable("$M$", "GeV")
+    plotter = HistogramPlotter(histplot, variable)
+    plotter.add_inset(xlim=(2, 4), title="Peak")
+    ax, ax_diff = plotter.plot(save=False)
+    assert len(ax.figure.axes) >= 2
+    assert any(a.get_title() == "Peak" for a in ax.figure.axes)
+    plt.close(ax.figure)
+
+
 def test_histogram_2d_plotter_end_to_end(synthetic_histogram):
     xhist = synthetic_histogram
     yhist = Histogram()
