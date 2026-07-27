@@ -1,5 +1,3 @@
-import importlib
-import sys
 from typing import Dict
 
 from afplotter.experiments.experiment import Experiment
@@ -28,17 +26,9 @@ def _load_experiments() -> None:
         return
 
     # Import submodules to trigger their registration logic
-    # Use reload to ensure module code is executed even if the module was previously imported
-    experiment_modules = ["afplotter.experiments.belle2", "afplotter.experiments.icecube", "afplotter.experiments.generic"]
-
-    for module_name in experiment_modules:
-        if module_name in sys.modules:
-            # If already imported, reload it to trigger re-registration
-            importlib.reload(sys.modules[module_name])
-        else:
-            # Otherwise, do a fresh import
-            parts = module_name.split(".")
-            __import__(module_name)
+    import afplotter.experiments.belle2  # noqa: F401
+    import afplotter.experiments.icecube  # noqa: F401
+    import afplotter.experiments.generic  # noqa: F401
 
     _LOADED = True
 
