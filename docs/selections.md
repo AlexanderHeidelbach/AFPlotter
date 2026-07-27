@@ -13,12 +13,13 @@ Supports `and`/`or`, `&`/`|`, comparisons (`>`, `>=`, `<`, `<=`, `==`, `!=`),
 the wrong filter rather than erroring — spell both out as separate
 `and`-joined comparisons instead (`eta > -2 and eta < 2`).
 
-`is` currently has two known issues: `x is NaN` correctly filters to
-non-null rows, but `x is None` does the opposite (filters to non-null
-rather than null rows), and `is not` always raises a `ValueError`. Until
-these are fixed, prefer Polars' own `.is_null()`/`.is_not_null()` directly
-on the LazyFrame for null-specific filtering rather than routing it through
-a `SelectionParser` query string.
+`is` currently doesn't do what its name suggests for null/NaN checks: `x is
+NaN` maps to `x.is_null()` (matches only true-null rows, not the NaN row),
+`x is None` maps to `x.is_not_null()` (the reverse of what the name
+implies), and `is not` always raises a `ValueError`. Until this is fixed,
+use Polars' own `.is_null()`/`.is_not_null()` directly on the LazyFrame for
+null-specific filtering rather than routing it through a `SelectionParser`
+query string.
 
 `SelectionOperator` applies one or more named selections to a Polars
 `LazyFrame`, either inline or from a JSON file:
