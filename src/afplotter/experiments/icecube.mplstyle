@@ -1,0 +1,95 @@
+
+#
+# IceCube Style
+#
+
+# .15 = dark_gray
+# .8 = light_gray
+figure.facecolor: white
+# figure.figsize: 7.0, 4.326 # : 8, 4.944
+figure.figsize: 8.0, 5.5 #6.4, 4.4
+
+text.color: .1
+font.size: 15
+text.usetex         : False
+
+
+# future.
+mathtext.cal : cursive
+mathtext.rm  : serif
+mathtext.tt  : monospace
+mathtext.it  : serif:italic
+mathtext.bf  : serif:bold
+mathtext.sf  : sans
+mathtext.fontset : cm # Should be 'dejavusans' (default),
+                               # 'dejavuserif', 'cm' (Computer Modern), 'stix',
+                               # 'stixsans' or 'custom'
+mathtext.fallback : cm  # When True, use symbols from the Computer Modern
+                        # fonts when a symbol can not be found in one of
+                        # the custom math fonts.
+
+
+mathtext.default : it # The default font to use for math.
+                       # Can be any of the LaTeX font names, including
+                       # the special name "regular" for the same font
+                       # used in regular text.
+
+
+font.family: sans-serif
+font.sans-serif: DejaVu Sans, Helvetia, Arial, Liberation Sans, Bitstream Vera Sans, sans-serif
+
+axes.labelcolor: .15
+axes.labelsize      : 22
+
+xtick.direction: out
+ytick.direction: out
+xtick.color: .15
+ytick.color: .15
+xtick.minor.visible : True
+ytick.minor.visible : True
+ytick.left           : True
+ytick.right          : False
+xtick.top            : False
+xtick.bottom         : True
+
+
+
+legend.frameon: False
+legend.numpoints: 1
+legend.scatterpoints: 1
+
+
+
+axes.axisbelow: False
+image.cmap: viridis
+
+grid.linestyle: -
+lines.solid_capstyle: round
+
+axes.grid: False
+axes.facecolor: white
+axes.edgecolor: .05
+axes.linewidth: 1.2
+axes.formatter.limits : -7, 7
+axes.prop_cycle: cycler('color', ['348ABD','E24A33', '988ED5', '777777', 'FBC15E', '8EBA42', 'FFB5B8'])
+#axes.prop_cycle: cycler('color', ['fd6769', '6bcdfd', '356535', '971497'])
+
+axes.formatter.use_mathtext : True
+axes.formatter.useoffset      : False
+#axes.formatter.offset_threshold : 80
+axes.labelpad       : 6.0
+axes.autolimit_mode : round_numbers
+
+
+grid.color: .8
+xtick.major.size: 6
+ytick.major.size: 6
+xtick.minor.size: 3
+ytick.minor.size: 3
+
+xtick.major.pad      : 6.
+ytick.major.pad      : 6.
+
+
+
+errorbar.capsize :  0
