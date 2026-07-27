@@ -5,10 +5,9 @@ from abc import ABC
 from cycler import cycler
 import matplotlib.pyplot as plt
 
-PathType = Union[str, os.PathLike]
+from afplotter.experiments.context import get_experiment
 
-style = os.path.join(os.environ.get("ALPS_PATH", ""), "belle2_modern.mplstyle")
-plt.style.use(style)
+PathType = Union[str, os.PathLike]
 
 
 class KITColors:
@@ -31,6 +30,13 @@ class KITColors:
     grey = "#797979"  # type: str
     dark_grey = "#4e4e4e"  # type: str
 
+    lmu_green = "#00883A"  # R 0,   G 136, B 58
+    lmu_blue = "#0F1987"  # R 15,  G 25,  B 135
+    lmu_cyan = "#643BE3"  # R 100, G 59,  B 227
+    lmu_violet = "#8C4091"  # R 140, G 64,  B 145
+    lmu_red = "#D71919"  # R 215, G 25,  B 25
+    lmu_orange = "#F18700"  # R 241, G 135, B 0
+
     default_colors = [
         kit_green,
         kit_blue,
@@ -48,39 +54,61 @@ class KITColors:
 kit_color_cycler = cycler("color", KITColors.default_colors)
 
 
-def set_matplotlibrc_params() -> None:
+def set_matplotlibrc_params(text_size: int = 25) -> None:
     """
-    Sets default parameters in the matplotlibrc.
+    Sets default matplotlibrc parameters, scaled relative to a base text size.
+
+    :param text_size: Base font size in points that tick/axis/legend sizes
+        and geometry are derived from. Defaults to 25.
     :return: None
     """
+    latex_text_size = text_size
+    tick_label_size = 0.8 * latex_text_size
+
+    major_tick_len = max(5, 0.25 * latex_text_size)
+    minor_tick_len = max(3, 0.12 * latex_text_size)
+    major_tick_w = max(1.0, 0.06 * latex_text_size)
+    minor_tick_w = max(0.8, 0.04 * latex_text_size)
+
     xtick = {
         "top": True,
         "minor.visible": True,
         "direction": "in",
-        "labelsize": 12,
+        "labelsize": tick_label_size,
+        "major.pad": 10,
+        "major.size": major_tick_len,
+        "minor.size": minor_tick_len,
+        "major.width": major_tick_w,
+        "minor.width": minor_tick_w,
     }
 
     ytick = {
         "right": True,
         "minor.visible": True,
         "direction": "in",
-        "labelsize": 12,
+        "labelsize": tick_label_size,
+        "major.size": major_tick_len,
+        "minor.size": minor_tick_len,
+        "major.width": major_tick_w,
+        "minor.width": minor_tick_w,
     }
 
     axes = {
-        "labelsize": "x-large",
+        "labelsize": latex_text_size,
         "prop_cycle": kit_color_cycler,
         "formatter.limits": (-4, 4),
         "formatter.use_mathtext": True,
-        "titlesize": "large",
+        "titlesize": latex_text_size,
         "labelpad": 4.0,
+        "linewidth": max(1.0, 0.05 * latex_text_size),
     }
-    lines = {
-        "lw": 1.5,
-    }
+
+    lines = {"lw": 1.5}
+
     legend = {
         "frameon": False,
-        "fontsize": "large",
+        "fontsize": latex_text_size * 0.6,
+        "title_fontsize": latex_text_size * 0.5,
     }
 
     plt.rc("lines", **lines)
@@ -91,7 +119,10 @@ def set_matplotlibrc_params() -> None:
 
     plt.rcParams.update(
         {
+            "font.size": latex_text_size,
             "figure.autolayout": True,
+            "savefig.dpi": 300,
+            "figure.dpi": 150,
         }
     )
 
@@ -100,6 +131,7 @@ class BasePlotter(ABC):
     """Abstract plotter class to set basic properties for specific plots"""
 
     def __init__(self) -> None:
+        get_experiment()
         set_matplotlibrc_params()
         self._figsize: Tuple[int, int] = (12, 8)
         self._label: Optional[Union[str, List[Optional[str]]]] = "label"
@@ -182,7 +214,7 @@ class BasePlotter(ABC):
 
     @property
     def luminosity(self) -> str:
-        return f"$\\int\\,L\\,\\mathrm{{dt}}\\;=\\;${self.luminosity_value:.2f}$\\; \\mathrm{{{self.luminosity_unit}}}^{{-1}}$"
+        return f"$\\int\\,L\\,\\mathrm{{d}}t\\;=\\;${self.luminosity_value:.0f}$\\; \\mathrm{{{self.luminosity_unit}}}^{{-1}}$"
 
     @property
     def legend_ncol(self) -> int:
@@ -282,6 +314,15 @@ class BasePlotter(ABC):
     def watermark_position(self, watermark_position: tuple) -> None:
         self._watermark_position = watermark_position
 
+    def set_matplotlibrc_params(self, text_size: int = 25) -> None:
+        """
+        Rescale matplotlib rcParams for this plot (e.g. for a presentation-sized figure).
+
+        :param text_size: Base font size in points. Defaults to 25.
+        :return: None
+        """
+        set_matplotlibrc_params(text_size)
+
     def add_text(self, text: str) -> None:
         self.text.append(text)
 
@@ -323,12 +364,12 @@ class BasePlotter(ABC):
         if self.luminosity_value:
             ax.text(
                 x,
-                y - 0.07,
+                y - 0.06,
                 self.luminosity,
                 ha="left",
                 transform=ax.transAxes,
                 alpha=0.8,
-                fontsize=15,
+                fontsize=20,
             )
         if self.text:
             [
