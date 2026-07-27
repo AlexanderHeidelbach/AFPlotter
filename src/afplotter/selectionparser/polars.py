@@ -1,7 +1,6 @@
 import ast
 from functools import reduce
 import json
-import os
 import operator
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
@@ -95,33 +94,24 @@ class SelectionOperator:
     def __init__(
         self,
         lazyframe: pl.LazyFrame,
-        selections_path_name: Optional[Union[str, Path]] = None,
+        selections_path: Optional[Union[str, Path]] = None,
         selections: Optional[Dict[str, str]] = None,
     ) -> None:
         self.lazyframe = lazyframe
-        if selections_path_name is not None:
-            self.selections = self._load_query_string(selections_path_name)
+        if selections_path is not None:
+            self.selections = self._load_query_string(selections_path)
         elif selections is not None:
             self.selections = selections
         else:
             raise ValueError(
-                "Either selections_path_name or selections must be provided."
+                "Either selections_path or selections must be provided."
             )
 
-    def _load_query_string(
-        self, selections_path_name: Union[str, Path]
-    ) -> Dict[str, str]:
+    def _load_query_string(self, selections_path: Union[str, Path]) -> Dict[str, str]:
         """
-        Loads the query string from a JSON file that contains only a string.
+        Loads the query string dict from a JSON file at the given path.
         """
-        selections_data = read_json(
-            os.path.join(
-                os.environ["ALPS_PATH"],
-                "configs/selections",
-                selections_path_name,
-            )
-        )
-        return selections_data
+        return read_json(selections_path)
 
     def _validate_columns(self, expr: pl.Expr) -> None:
         """
