@@ -63,7 +63,7 @@ def test_histogram_plot_data_only(synthetic_histogram):
     fig, ax = plt.subplots()
     histplot.ax = ax
     histplot.plot()
-    assert len(ax.get_lines()) >= 0  # errorbar uses containers, not lines directly
+    assert len(ax.containers) == 1  # plot_data() draws via ax.errorbar(), which populates containers, not lines
     plt.close(fig)
 
 
