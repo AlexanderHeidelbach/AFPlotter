@@ -1,0 +1,21 @@
+{
+  "name": "afplotter-tools",
+  "owner": {
+    "name": "Alexander Heidelbach",
+    "email": "heidelbachalex@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "afplotter",
+      "source": "./",
+      "skills": ["./.claude/skills/afplotter"],
+      "description": "Claude Code skill for the AFPlotter HEP plotting library (Belle II / generic analyses)",
+      "version": "1.0.0",
+      "author": {
+        "name": "Alexander Heidelbach"
+      },
+      "homepage": "https://github.com/AlexanderHeidelbach/AFPlotter",
+      "repository": "https://github.com/AlexanderHeidelbach/AFPlotter"
+    }
+  ]
+}

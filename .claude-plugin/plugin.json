@@ -1,0 +1,8 @@
+{
+  "name": "afplotter",
+  "description": "Claude Code skill for the AFPlotter HEP plotting library (Belle II / generic analyses)",
+  "version": "1.0.0",
+  "author": {
+    "name": "Alexander Heidelbach"
+  }
+}
