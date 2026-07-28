@@ -54,12 +54,13 @@ class KITColors:
 kit_color_cycler = cycler("color", KITColors.default_colors)
 
 
-def set_matplotlibrc_params(text_size: int = 25) -> None:
+def set_matplotlibrc_params(text_size: int = 36) -> None:
     """
     Sets default matplotlibrc parameters, scaled relative to a base text size.
 
     :param text_size: Base font size in points that tick/axis/legend sizes
-        and geometry are derived from. Defaults to 25.
+        and geometry are derived from. Defaults to 36 (paper-ready — legible
+        after a figure is shrunk to fit a paper column).
     :return: None
     """
     latex_text_size = text_size
@@ -314,11 +315,11 @@ class BasePlotter(ABC):
     def watermark_position(self, watermark_position: tuple) -> None:
         self._watermark_position = watermark_position
 
-    def set_matplotlibrc_params(self, text_size: int = 25) -> None:
+    def set_matplotlibrc_params(self, text_size: int = 36) -> None:
         """
         Rescale matplotlib rcParams for this plot (e.g. for a presentation-sized figure).
 
-        :param text_size: Base font size in points. Defaults to 25.
+        :param text_size: Base font size in points. Defaults to 36 (paper-ready).
         :return: None
         """
         set_matplotlibrc_params(text_size)

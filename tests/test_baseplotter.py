@@ -151,15 +151,15 @@ def test_kit_colors_defines_lmu_colors():
     assert KITColors.lmu_orange == "#F18700"
 
 
-def test_set_matplotlibrc_params_default_text_size_25():
+def test_set_matplotlibrc_params_default_text_size_36():
     plotter = ConcretePlotter()
-    plotter.set_matplotlibrc_params()  # default text_size=25
-    assert plt.rcParams["xtick.labelsize"] == 20.0  # 0.8 * 25
-    assert plt.rcParams["axes.labelsize"] == 25.0
-    assert plt.rcParams["legend.fontsize"] == 15.0  # 25 * 0.6
-    assert plt.rcParams["legend.title_fontsize"] == 12.5  # 25 * 0.5
-    assert plt.rcParams["font.size"] == 25.0
-    assert plt.rcParams["savefig.dpi"] == 300.0
+    plotter.set_matplotlibrc_params()  # default text_size=36
+    assert plt.rcParams["xtick.labelsize"] == pytest.approx(28.8)  # 0.8 * 36
+    assert plt.rcParams["axes.labelsize"] == pytest.approx(36.0)
+    assert plt.rcParams["legend.fontsize"] == pytest.approx(21.6)  # 36 * 0.6
+    assert plt.rcParams["legend.title_fontsize"] == pytest.approx(18.0)  # 36 * 0.5
+    assert plt.rcParams["font.size"] == pytest.approx(36.0)
+    assert plt.rcParams["savefig.dpi"] == pytest.approx(300.0)
 
 
 def test_set_matplotlibrc_params_scales_with_text_size():
