@@ -35,6 +35,8 @@ def main() -> None:
         xlim=(0.2, 2.0),
         ylim=(0.0, float(expected[masses < 2.0].max()) * 1.3),
         bbox_to_anchor=(0.45, 0.5, 0.5, 0.45),
+        width="100%",
+        height="100%",
         title="Low-mass region",
         tick_labelsize=10,
         title_fontsize=11,

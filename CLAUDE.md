@@ -2,7 +2,7 @@
 
 A matplotlib-based plotting library for HEP analyses: histograms (stacked/step/pull/ratio),
 2D histograms, composed "generic" plots, Polars-based lazy histogramming, and a
-query-string selection parser. Built-in experiment styles (Belle II / IceCube / Generic).
+query-string selection parser. Built-in experiment styles (Belle II / Generic).
 
 This file orients contributors and AI agents working in this repo. User-facing docs are in
 `README.md` and `docs/`.
@@ -105,13 +105,11 @@ examples/skill are in place.
 
 Open follow-ups:
 
-- Test isolation in `tests/experiments/` mutates module-global registry state without teardown —
-  the suite passes in full-suite order but can fail under `pytest -k`, `--last-failed`, or
-  parallel runs. Convert to an autouse fixture that cleans up before *and* after.
-- `Experiment.colors` / `Experiment.labels` are defined but never read, and the `"Belle II"`
-  watermark in `baseplotter.py` is hardcoded regardless of the selected experiment — so
-  non-Belle II styles are currently placeholders. Wiring the watermark to
-  `get_experiment().labels` would give those fields a purpose.
+- `Experiment.colors` and `labels["status"]` are defined but never read (only `labels["experiment"]`
+  is wired, into the watermark name text). `KITColors` is still the only source of plotting colors.
+- Only `BelleII` (real, Alex's own style) and `Generic` (neutral matplotlib-defaults fallback) ship
+  built in. Register your own via `afplotter.experiments.registry.register(...)` rather than adding
+  more built-ins for experiments this repo's maintainer isn't part of.
 - `importlib_resources` is declared as a runtime dependency but never imported — drop it.
 - `requires-python = ">=3.8"` is untested; modern polars/numpy/matplotlib no longer ship 3.8
   wheels. Either add a low-version CI job or raise the floor to what's actually supported.

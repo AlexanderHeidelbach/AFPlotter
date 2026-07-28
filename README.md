@@ -2,8 +2,8 @@
 
 A standalone matplotlib-based plotting library for HEP analyses (histograms,
 2D histograms, composed/generic plots, Polars-based lazy histogramming, and
-an AST-based selection-query parser), with built-in Belle II / IceCube /
-Generic experiment styles.
+an AST-based selection-query parser), with built-in Belle II / Generic
+experiment styles. Register your own via `afplotter.experiments.registry`.
 
 ## Install
 
@@ -21,7 +21,7 @@ Or for local development:
 from afplotter import plot_histogram, set_experiment
 import numpy as np
 
-set_experiment("BelleII")  # or "IceCube" / "Generic"
+set_experiment("BelleII")  # or "Generic"
 
 rng = np.random.default_rng(0)
 plot_histogram(

@@ -27,7 +27,6 @@ def _load_experiments() -> None:
 
     # Import submodules to trigger their registration logic
     import afplotter.experiments.belle2  # noqa: F401
-    import afplotter.experiments.icecube  # noqa: F401
     import afplotter.experiments.generic  # noqa: F401
 
     _LOADED = True

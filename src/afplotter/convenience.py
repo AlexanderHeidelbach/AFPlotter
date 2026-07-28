@@ -85,7 +85,7 @@ def plot_histogram_from_files(
     :param bins: A bin-edges array/list, or a (start, stop, num) tuple.
     :param xlabel: X-axis label.
     :param stacked: Whether entries are drawn stacked rather than as outlined steps.
-    :param selection: Optional query string (e.g. "pt > 5 and abs(eta) < 2")
+    :param selection: Optional query string (e.g. "pt > 5 and eta > -2 and eta < 2")
         applied to each entry before histogramming.
     :param save: If given, the plot is saved to this path instead of shown.
     :param histogram_plotter_kwargs: Extra HistogramPlotter properties to set.

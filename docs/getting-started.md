@@ -11,7 +11,7 @@ matplotlib style on first use. Pick one explicitly before plotting:
 
 ```python
 from afplotter import set_experiment
-set_experiment("BelleII")  # or "IceCube", "Generic"
+set_experiment("BelleII")  # or "Generic"
 ```
 
 If you never call `set_experiment`, the first plot falls back to `"Generic"`

@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from afplotter.baseplotter import BasePlotter, KITColors
+from afplotter.experiments.context import set_experiment
 
 
 class ConcretePlotter(BasePlotter):
@@ -75,6 +76,7 @@ def test_luminosity_formats_with_zero_decimals():
 
 
 def test_add_text_to_plot_renders_watermark_and_luminosity():
+    set_experiment("BelleII")
     plotter = ConcretePlotter()
     plotter.luminosity_value = 408.0
     plotter.add_text("(Preliminary)")
@@ -86,6 +88,24 @@ def test_add_text_to_plot_renders_watermark_and_luminosity():
     assert plotter.luminosity in texts
     assert texts[plotter.luminosity].get_fontsize() == 20.0
     assert "(Preliminary)" in texts
+    plt.close(fig)
+
+
+def test_add_text_to_plot_experiment_name_follows_set_experiment():
+    """The big experiment-name text must track set_experiment(), not be hardcoded."""
+    set_experiment("Generic")
+    plotter = ConcretePlotter()
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    texts = [t.get_text() for t in ax.texts]
+    assert "Belle II" not in texts
+    plt.close(fig)
+
+    set_experiment("BelleII")
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    texts = [t.get_text() for t in ax.texts]
+    assert "Belle II" in texts
     plt.close(fig)
 
 

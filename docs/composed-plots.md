@@ -40,13 +40,17 @@ follows its conventions: `width`/`height` are percentage strings of the
 parent axes (default `"38%"`/`"38%"`), placed via a legend-style `loc`
 string (default `"upper center"`). For precise placement, pass
 `bbox_to_anchor=(x0, y0, w, h)` (axes-fraction coordinates) instead of
-relying on `loc`:
+relying on `loc`. `width`/`height` still default to `"38%"` even with
+`bbox_to_anchor` set, so pass `width="100%", height="100%"` to fill the box
+exactly:
 
 ```python
 plotter.add_inset(
     xlim=(0.17, 1.0),
     ylim=(0, 9),
     bbox_to_anchor=(-0.35, 0.04, 0.8, 0.8),
+    width="100%",
+    height="100%",
     title="$0.16 < m_a < 1.0$ GeV/$c^2$",
     tick_labelsize=20,
     title_fontsize=20,

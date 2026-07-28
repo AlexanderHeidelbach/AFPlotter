@@ -344,7 +344,7 @@ class BasePlotter(ABC):
         ax.text(
             x,
             y,
-            "Belle II",
+            get_experiment().labels.get("experiment", ""),
             ha="left",
             transform=ax.transAxes,
             style="italic",

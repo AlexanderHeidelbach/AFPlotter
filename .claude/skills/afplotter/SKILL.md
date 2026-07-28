@@ -15,7 +15,7 @@ Always start the script with:
 
 ```python
 from afplotter import set_experiment
-set_experiment("BelleII")  # ask the user if unclear whether BelleII/IceCube/Generic
+set_experiment("BelleII")  # ask the user if unclear whether BelleII/Generic
 ```
 
 ## Step 2: Pick the right interface
