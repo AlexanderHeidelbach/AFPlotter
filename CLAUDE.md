@@ -53,6 +53,7 @@ limits) chain `add_generic_plot(...)` / `add_generic_text(...)` / `add_inset(...
 | Selections take an explicit path | Was `$ALPS_PATH/configs/selections/<name>`; now `SelectionOperator(lf, selections_path=...)` or an inline dict. Same env-var-independence goal as the style fix. |
 | Skill over MCP server | Ships as `.claude/skills/afplotter/SKILL.md` in-repo — no server process to run or configure, and it activates automatically for anyone who clones the repo and uses Claude Code. |
 | Install from git, not PyPI | Personal/lab tool; `pip install git+https://github.com/AlexanderHeidelbach/AFPlotter.git`. |
+| Petroff 10 as the default cycle, with its red held out | There used to be four uncoordinated palettes: `KITColors` (installed as `axes.prop_cycle`), the ggplot cycler in `belle2_modern.mplstyle` (dead — clobbered by `set_matplotlibrc_params`), seaborn cubehelix (`b2helix`, stacked plots only), and `Experiment.colors` (dead). A stacked and a step plot of the same data looked nothing alike. Now one cycle (`PetroffColors.default_colors`, 9 colours) feeds both paths, and `SIGNAL_COLOR = "#bd1f01"` is excluded from it so red always means signal. `KITColors` stays exported, just not default. |
 
 ## Conventions
 
@@ -108,7 +109,15 @@ examples/skill are in place.
 Open follow-ups:
 
 - `Experiment.colors` and `labels["status"]` are defined but never read (only `labels["experiment"]`
-  is wired, into the watermark name text). `KITColors` is still the only source of plotting colors.
+  is wired, into the watermark name text). Their values now at least agree with `PetroffColors`,
+  but nothing consumes them — signal red is deliberately experiment-independent.
+- **Entry colors are all-or-nothing.** `plot_stacked` and `plot_step` both discard *every*
+  user-set `HistogramEntry.color` if *any* entry lacks one, and fall back to the whole cycle
+  (`histogramplot.py`, the `if not all((color is not None) ...)` guards). `plot_step` also
+  drops the hatches on that path. A per-entry "fill in only the missing ones" path would be
+  the right fix.
+- `HistogramPlot.b2helix` (seaborn cubehelix) is no longer called by anything — it is the only
+  reason `seaborn` is a runtime dependency. Drop both together if nobody is using it.
 - Only `BelleII` (real, Alex's own style) and `Generic` (neutral matplotlib-defaults fallback) ship
   built in. Register your own via `afplotter.experiments.registry.register(...)` rather than adding
   more built-ins for experiments this repo's maintainer isn't part of.

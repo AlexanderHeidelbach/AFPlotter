@@ -71,8 +71,8 @@ axes.facecolor: white
 axes.edgecolor: .05
 axes.linewidth: 1.2
 axes.formatter.limits : -7, 7
-axes.prop_cycle: cycler('color', ['348ABD','E24A33', '988ED5', '777777', 'FBC15E', '8EBA42', 'FFB5B8'])
-#axes.prop_cycle: cycler('color', ['fd6769', '6bcdfd', '356535', '971497'])
+# Petroff 10 (arXiv:2107.02270) minus its red 'bd1f01', which is reserved for signal.
+axes.prop_cycle: cycler('color', ['3f90da', 'ffa90e', '94a4a2', '832db6', 'a96b59', 'e76300', 'b9ac70', '717581', '92dadd'])
 
 axes.formatter.use_mathtext : True
 axes.formatter.useoffset      : False

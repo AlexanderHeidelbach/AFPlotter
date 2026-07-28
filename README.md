@@ -53,10 +53,14 @@ plot_histogram(
 )
 ```
 
+Colors come from the [Petroff 10](https://arxiv.org/abs/2107.02270) sequence by default,
+with its red held out of the cycle and reserved for signal components — see
+[Histograms → Colours](docs/histograms.md#colours).
+
 ## Docs
 
 - [Getting started](docs/getting-started.md) — experiment styles, `BasePlotter` properties
-- [Histograms](docs/histograms.md) — stacked/step/pull plots, 2D histograms, the convenience layer
+- [Histograms](docs/histograms.md) — stacked/step/pull plots, 2D histograms, colours, the convenience layer
 - [Composed plots](docs/composed-plots.md) — `GenericPlotter`, fills/exclusion bands, `add_inset`
 - [Selections](docs/selections.md) — the query-string filter parser
 

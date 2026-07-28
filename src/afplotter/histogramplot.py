@@ -5,7 +5,7 @@ from matplotlib.colors import to_hex  # type: ignore
 import numpy as np  # type: ignore
 import seaborn as sns  # type: ignore
 
-from afplotter.baseplotter import BasePlotter
+from afplotter.baseplotter import SIGNAL_COLOR, BasePlotter
 from afplotter.genericplot import GenericPlot, InsetPlot
 from afplotter.utilities.histogram import Histogram
 
@@ -204,7 +204,7 @@ class HistogramPlot:
     def plot_stacked(self) -> None:
         colors = self.histogram.get_colors()
         if not all((color is not None) for color in colors):
-            colors = self.b2helix(len(self.histogram.entries))
+            colors = self.std_colors(len(self.histogram.entries))
 
         self.ax.hist(
             self.histogram.get_bin_centers(),
@@ -263,7 +263,9 @@ class HistogramPlot:
                     colors = self.histogram.get_signal_colors()
 
             else:
-                colors = ["red"]
+                # A lone signal component is always drawn in the reserved signal
+                # colour, overriding any explicitly set HistogramEntry.color.
+                colors = [SIGNAL_COLOR]
             hatches = [None] * len(self.histogram.signal)
 
         if labels is None:

@@ -1,10 +1,9 @@
 import os
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pytest
 
-from afplotter.baseplotter import BasePlotter, KITColors
+from afplotter.baseplotter import SIGNAL_COLOR, BasePlotter, KITColors, PetroffColors
 from afplotter.experiments.context import set_experiment
 
 
@@ -184,6 +183,37 @@ def test_kit_colors_defines_lmu_colors():
     assert KITColors.lmu_green == "#00883A"
     assert KITColors.lmu_blue == "#0F1987"
     assert KITColors.lmu_orange == "#F18700"
+
+
+def test_petroff_colors_hold_red_out_of_the_cycle():
+    # The full Petroff 10 sequence, minus its red, is what may be handed to
+    # background components. Red must be reachable only as the signal colour.
+    assert PetroffColors.default_colors == [
+        "#3f90da",
+        "#ffa90e",
+        "#94a4a2",
+        "#832db6",
+        "#a96b59",
+        "#e76300",
+        "#b9ac70",
+        "#717581",
+        "#92dadd",
+    ]
+    assert PetroffColors.red == "#bd1f01"
+    assert PetroffColors.red not in PetroffColors.default_colors
+
+
+def test_signal_color_is_the_reserved_petroff_red():
+    assert SIGNAL_COLOR == "#bd1f01"
+    assert SIGNAL_COLOR == PetroffColors.signal_red
+
+
+def test_constructing_a_plotter_installs_the_petroff_cycle():
+    # Regression guard: BasePlotter.__init__ applies the experiment .mplstyle and
+    # *then* set_matplotlibrc_params(). The Petroff cycle must be what survives.
+    plt.rcParams["axes.prop_cycle"] = plt.cycler("color", ["#123456"])
+    ConcretePlotter()
+    assert plt.rcParams["axes.prop_cycle"].by_key()["color"] == PetroffColors.default_colors
 
 
 def test_set_matplotlibrc_params_default_text_size_36():

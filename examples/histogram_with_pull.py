@@ -1,7 +1,8 @@
 # examples/histogram_with_pull.py
 """
 Mirrors a real fit-result plot: a stacked histogram with signal/background
-model curves and a pull panel, styled with BelleII colors.
+model curves and a pull panel, styled with BelleII settings and the default
+Petroff color cycle (signal in the reserved SIGNAL_COLOR red).
 
 Run: python examples/histogram_with_pull.py
 """
@@ -16,7 +17,8 @@ from afplotter import (
     HistogramPlot,
     HistogramPlotter,
     HistogramVariable,
-    KITColors,
+    SIGNAL_COLOR,
+    PetroffColors,
     set_experiment,
 )
 from _synthetic_data import make_signal_background
@@ -32,9 +34,11 @@ def main() -> None:
 
     hist = Histogram()
     hist.binning = np.linspace(x_min, x_max, 41)
-    hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=KITColors.kit_orange))
+    # Colors are all-or-nothing per stack: set every entry or none of them (in
+    # which case the Petroff cycle supplies them in order).
+    hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=SIGNAL_COLOR))
     hist.add_entry(
-        HistogramEntry(name="background", latex_name="Background", array=data["background"], color=KITColors.kit_blue)
+        HistogramEntry(name="background", latex_name="Background", array=data["background"], color=PetroffColors.blue)
     )
 
     histplot = HistogramPlot(hist)
@@ -56,8 +60,8 @@ def main() -> None:
         background = n_background / (x_max - x_min)
         return signal + background
 
-    plotter.add_function(model, binwidth=True, label="Model", color=KITColors.kit_purple, lw=2)
-    plotter.add_pull(model, binwidth=True, color=KITColors.kit_purple, label="Model", lw=2, max_sigma=5.0)
+    plotter.add_function(model, binwidth=True, label="Model", color=PetroffColors.purple, lw=2)
+    plotter.add_pull(model, binwidth=True, color=PetroffColors.purple, label="Model", lw=2, max_sigma=5.0)
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     plotter.savedir = OUTPUT_DIR

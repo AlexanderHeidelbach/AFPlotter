@@ -51,7 +51,49 @@ class KITColors:
     ]  # type: list[str]
 
 
+class PetroffColors:
+    """
+    Petroff 10 colour sequence, as shipped in matplotlib's ``petroff10`` style.
+
+    See M. A. Petroff, "Accessible Color Sequences for Data Visualization",
+    arXiv:2107.02270.
+
+    ``red`` is deliberately held out of :attr:`default_colors` and re-exported as
+    :attr:`signal_red` / the module-level ``SIGNAL_COLOR``, so that no background
+    component can ever collide with the colour reserved for signal.
+    """
+
+    blue = "#3f90da"  # type: str
+    amber = "#ffa90e"  # type: str
+    red = "#bd1f01"  # type: str
+    grey_green = "#94a4a2"  # type: str
+    purple = "#832db6"  # type: str
+    brown = "#a96b59"  # type: str
+    orange = "#e76300"  # type: str
+    khaki = "#b9ac70"  # type: str
+    slate = "#717581"  # type: str
+    pale_cyan = "#92dadd"  # type: str
+
+    signal_red = red  # type: str
+
+    default_colors = [
+        blue,
+        amber,
+        grey_green,
+        purple,
+        brown,
+        orange,
+        khaki,
+        slate,
+        pale_cyan,
+    ]  # type: list[str]
+
+
+#: Colour used for signal components. Never appears in the default cycle.
+SIGNAL_COLOR = PetroffColors.signal_red
+
 kit_color_cycler = cycler("color", KITColors.default_colors)
+petroff_color_cycler = cycler("color", PetroffColors.default_colors)
 
 
 def set_matplotlibrc_params(text_size: int = 36) -> None:
@@ -96,7 +138,7 @@ def set_matplotlibrc_params(text_size: int = 36) -> None:
 
     axes = {
         "labelsize": latex_text_size,
-        "prop_cycle": kit_color_cycler,
+        "prop_cycle": petroff_color_cycler,
         "formatter.limits": (-4, 4),
         "formatter.use_mathtext": True,
         "titlesize": latex_text_size,

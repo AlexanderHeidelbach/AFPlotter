@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+from matplotlib.colors import to_hex
 
+from afplotter.baseplotter import SIGNAL_COLOR, PetroffColors
 from afplotter.histogramplot import (
     Histogram2DPlot,
     Histogram2DPlotter,
@@ -123,13 +125,86 @@ def test_histogram_plotter_add_inset_default_plots(synthetic_histogram):
     plt.close(ax.figure)
 
 
+def _uncolored_histogram(n_entries: int = 3, n_signals: int = 0) -> Histogram:
+    """A Histogram whose entries carry no explicit colour, so the cycle has to supply them."""
+    rng = np.random.default_rng(seed=7)
+    hist = Histogram()
+    hist.binning = np.linspace(0, 10, 21)
+    for i in range(n_entries):
+        hist.add_entry(HistogramEntry(name=f"bkg{i}", latex_name=f"B{i}", array=rng.uniform(0, 10, 400)))
+    for i in range(n_signals):
+        hist.add_entry(
+            HistogramEntry(
+                name=f"sig{i}",
+                latex_name=f"S{i}",
+                array=rng.normal(5, 1, 300),
+                type="signal",
+            )
+        )
+    return hist
+
+
+def _rendered_colors(hist: Histogram, sig_extra: bool = False) -> dict[str, tuple[str, str]]:
+    """Render ``hist`` and map each artist's label to its (facecolor, edgecolor) hex.
+
+    Stacked ``stepfilled`` bars are filled Polygons; overlaid ``step`` signals are
+    unfilled Polygons whose colour lives on the edge. Keying by label rather than by
+    index matters because matplotlib emits the stack in reverse draw order.
+    """
+    histplot = HistogramPlot(hist)
+    histplot.stacked = True
+    histplot.sig_extra = sig_extra
+    plotter = HistogramPlotter(histplot, HistogramVariable("$M$", "GeV"))
+    ax, _ = plotter.plot(save=False)
+    colors = {patch.get_label(): (to_hex(patch.get_facecolor()), to_hex(patch.get_edgecolor())) for patch in ax.patches}
+    plt.close(ax.figure)
+    return colors
+
+
+def test_stacked_entries_use_the_petroff_cycle():
+    colors = _rendered_colors(_uncolored_histogram(n_entries=3))
+    assert [colors[f"B{i}"][0] for i in range(3)] == PetroffColors.default_colors[:3]
+
+
+def test_no_stacked_entry_is_ever_signal_red():
+    # 12 entries wraps past the end of the 9-colour cycle; red must still never appear.
+    colors = _rendered_colors(_uncolored_histogram(n_entries=12))
+    assert SIGNAL_COLOR not in [face for face, _ in colors.values()]
+
+
+def test_single_signal_is_drawn_in_signal_red():
+    colors = _rendered_colors(_uncolored_histogram(n_entries=2, n_signals=1), sig_extra=True)
+    assert colors["S0"][1] == SIGNAL_COLOR
+    assert [colors[f"B{i}"][0] for i in range(2)] == PetroffColors.default_colors[:2]
+
+
+def test_single_signal_red_overrides_an_explicit_entry_color():
+    hist = _uncolored_histogram(n_entries=2)
+    hist.add_entry(
+        HistogramEntry(
+            name="sig0",
+            latex_name="S0",
+            array=np.random.default_rng(8).normal(5, 1, 300),
+            type="signal",
+            color="#00ff00",
+        )
+    )
+    colors = _rendered_colors(hist, sig_extra=True)
+    assert colors["S0"][1] == SIGNAL_COLOR
+
+
+def test_multiple_signals_fall_back_to_the_cycle():
+    colors = _rendered_colors(_uncolored_histogram(n_entries=2, n_signals=2), sig_extra=True)
+    signal_edges = [colors["S0"][1], colors["S1"][1]]
+    assert signal_edges == PetroffColors.default_colors[:2]
+    assert SIGNAL_COLOR not in signal_edges
+
+
 def test_histogram_2d_plotter_end_to_end(synthetic_histogram):
     xhist = synthetic_histogram
     yhist = Histogram()
     yhist.binning = np.linspace(0, 10, 21)
-    yhist.add_entry(
-        HistogramEntry(name="signal", array=np.random.default_rng(3).normal(5, 1, 500))
-    )
+    yhist.add_entry(HistogramEntry(name="signal", array=np.random.default_rng(3).normal(5, 1, 500)))
     xvar = HistogramVariable("$M_x$", "GeV")
     yvar = HistogramVariable("$M_y$", "GeV")
     plotter = Histogram2DPlotter(Histogram2DPlot(xhist, yhist), xvar, yvar)

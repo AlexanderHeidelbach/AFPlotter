@@ -1,5 +1,6 @@
 """AFPlotter: a standalone HEP plotting library."""
-from afplotter.baseplotter import BasePlotter, KITColors
+
+from afplotter.baseplotter import SIGNAL_COLOR, BasePlotter, KITColors, PetroffColors
 from afplotter.convenience import plot_2d_histogram, plot_histogram, plot_histogram_from_files
 from afplotter.experiments.context import get_experiment, set_experiment
 from afplotter.genericplot import GenericPlot, GenericPlotter, InsetPlot

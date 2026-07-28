@@ -29,8 +29,8 @@ import numpy as np
 
 hist = Histogram()
 hist.binning = np.linspace(0, 10, 41)
-hist.add_entry(HistogramEntry(name="signal", array=signal_array, color="#E41A1C"))
-hist.add_entry(HistogramEntry(name="background", array=bkg_array, color="#377EB8"))
+hist.add_entry(HistogramEntry(name="continuum", array=continuum_array))  # colour from the cycle
+hist.add_entry(HistogramEntry(name="background", array=bkg_array, color="#377EB8"))  # or set one
 
 histplot = HistogramPlot(hist)
 histplot.stacked = True
@@ -44,6 +44,38 @@ plotter.plot(save=True)
 
 `HistogramPlot.data_hist` + `HistogramPlot.data_only = True` overlays a
 data-only errorbar plot instead of (or alongside) the modeled entries.
+
+## Colours
+
+The default colour cycle is the **Petroff 10** sequence
+([arXiv:2107.02270](https://arxiv.org/abs/2107.02270)), minus its red — nine colours,
+exposed as `PetroffColors.default_colors` and installed as `axes.prop_cycle`. Entries
+that do not set `color=` take colours from it in order, the same way for stacked and
+step plots.
+
+The held-out red `#bd1f01` is `SIGNAL_COLOR` (`PetroffColors.signal_red`). Because it
+is not in the cycle, no background component can ever be drawn in it.
+
+An entry with `type="signal"` is routed into `Histogram.signal` and drawn as an
+outlined step overlay when `HistogramPlot.sig_extra = True`:
+
+```python
+from afplotter import Histogram, HistogramEntry, HistogramPlot, SIGNAL_COLOR
+
+hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=sig_array, type="signal"))
+
+histplot = HistogramPlot(hist)
+histplot.stacked = True    # `entries` form the stack
+histplot.sig_extra = True  # `signal` is overlaid on top, in SIGNAL_COLOR
+```
+
+Caveats worth knowing:
+
+- When there is exactly **one** signal component it is always `SIGNAL_COLOR`; an
+  explicit `color=` on that entry is ignored.
+- When there are **several** signal components they fall back to the ordinary cycle,
+  or to their explicit `color=` values if all of them set one.
+- `KITColors` is still exported and unchanged — it is just no longer the default.
 
 ## 2D histograms
 
