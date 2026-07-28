@@ -342,7 +342,7 @@ class BasePlotter(ABC):
         """Handling of different texts in the plot."""
         x = self.watermark_position[0]
         y = self.watermark_position[1]
-        ax.text(
+        experiment_text = ax.text(
             x,
             y,
             get_experiment().labels.get("experiment", ""),
@@ -353,8 +353,14 @@ class BasePlotter(ABC):
             weight="bold",
             fontsize=plt.rcParams["xtick.labelsize"],
         )
+        # The watermark's x-position depends on the rendered width of the
+        # experiment-name text above, which varies with font size and the
+        # experiment's name itself — a fixed offset only holds for one font size.
+        ax.figure.canvas.draw()
+        renderer = ax.figure.canvas.get_renderer()  # type: ignore
+        experiment_bbox = experiment_text.get_window_extent(renderer=renderer).transformed(ax.transAxes.inverted())
         ax.text(
-            x + 0.130,
+            experiment_bbox.x1 + 0.02,
             y,
             self.watermark,
             ha="left",

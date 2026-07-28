@@ -109,6 +109,41 @@ def test_add_text_to_plot_experiment_name_follows_set_experiment():
     plt.close(fig)
 
 
+def _watermark_gap(plotter, ax):
+    """Horizontal gap (axes-fraction) between the experiment-name text and the
+    watermark text that follows it. Negative means they overlap."""
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    texts = {t.get_text(): t for t in ax.texts}
+    experiment_bbox = texts["Belle II"].get_window_extent(renderer=renderer).transformed(ax.transAxes.inverted())
+    watermark_bbox = texts[plotter.watermark].get_window_extent(renderer=renderer).transformed(ax.transAxes.inverted())
+    return watermark_bbox.x0 - experiment_bbox.x1
+
+
+def test_add_text_to_plot_watermark_does_not_overlap_experiment_name_at_default_size():
+    """Regression test for the watermark colliding with the experiment name at the
+    default (36pt base) font size — the fixed 0.130 axes-fraction offset was only
+    ever tuned for the smaller font size used in the bundled examples."""
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    assert _watermark_gap(plotter, ax) >= 0
+    plt.close(fig)
+
+
+def test_add_text_to_plot_watermark_spacing_holds_at_reduced_font_size():
+    """Regression check: the fix must not break spacing at the smaller font size
+    used by the bundled examples (examples/histogram_with_pull.py etc.)."""
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params(16)
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    assert _watermark_gap(plotter, ax) >= 0
+    plt.close(fig)
+
+
 def test_set_axislimits_linear_expands_ylim_for_legend():
     plotter = ConcretePlotter()
     plotter.legend_ncol = 2
