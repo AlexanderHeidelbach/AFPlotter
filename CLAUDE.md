@@ -10,9 +10,8 @@ This file orients contributors and AI agents working in this repo. User-facing d
 ## Setup
 
 ```bash
-python3 -m venv venv && source venv/bin/activate
-pip install -e ".[dev]"
-pytest tests/ -v          # full suite
+uv sync --extra dev
+uv run pytest tests/ -v   # full suite
 ```
 
 `pre-commit run --all-files` runs ruff (lint + format) and mypy.
