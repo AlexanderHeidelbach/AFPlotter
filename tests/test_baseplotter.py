@@ -86,7 +86,7 @@ def test_add_text_to_plot_renders_watermark_and_luminosity():
     assert "Belle II" in texts
     assert plotter.watermark in texts
     assert plotter.luminosity in texts
-    assert texts[plotter.luminosity].get_fontsize() == 20.0
+    assert texts[plotter.luminosity].get_fontsize() == pytest.approx(plt.rcParams["xtick.labelsize"])
     assert "(Preliminary)" in texts
     plt.close(fig)
 

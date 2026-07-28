@@ -58,6 +58,9 @@ limits) chain `add_generic_plot(...)` / `add_generic_text(...)` / `add_inset(...
 
 - **Python 3.10+ typing**: native `X | Y` unions and builtin generics (`list[X]`, `dict[K, V]`,
   `tuple[X, Y]`) — no `typing.Optional`/`List`/`Dict`/`Tuple`/`Union` imports.
+- Local `uv sync` picks whatever interpreter satisfies `>=3.10` (may be newer than 3.10); CI
+  pins exactly 3.10 via `--python 3.10`. A local green run doesn't guarantee CI will match —
+  check the CI run itself for anything version-sensitive.
 - **reST docstrings** (`:param:` / `:return:`) on public functions and classes.
 - **No import-time side effects** that touch the filesystem or env vars. `import afplotter` must
   succeed in a bare environment — `tests/test_packaging.py` guards this as a regression test.
@@ -99,7 +102,7 @@ and write a PNG to `examples/output/` (gitignored).
 ## Status
 
 Standalone-packaging work is complete on `feature/standalone-package-and-skill`: the import-time
-crash is fixed, all previously-empty test files have real coverage (87 tests), and README/docs/
+crash is fixed, all previously-empty test files have real coverage (93 tests), and README/docs/
 examples/skill are in place.
 
 Open follow-ups:
@@ -110,7 +113,5 @@ Open follow-ups:
   built in. Register your own via `afplotter.experiments.registry.register(...)` rather than adding
   more built-ins for experiments this repo's maintainer isn't part of.
 - `importlib_resources` is declared as a runtime dependency but never imported — drop it.
-- `requires-python = ">=3.10"` is exercised by CI (single version, no matrix) — see
-  `.github/workflows/ci.yml`.
 - A few tests in `tests/test_histogramplot.py` assert only "didn't crash" — see the testing
   philosophy above.

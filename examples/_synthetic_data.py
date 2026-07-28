@@ -1,12 +1,10 @@
 # examples/_synthetic_data.py
 """Synthetic data generators shared by the example scripts."""
 
-from typing import Dict, Tuple
-
 import numpy as np
 
 
-def make_signal_background(n_signal: int = 500, n_background: int = 1000, seed: int = 0) -> Dict[str, np.ndarray]:
+def make_signal_background(n_signal: int = 500, n_background: int = 1000, seed: int = 0) -> dict[str, np.ndarray]:
     """
     Generate a Gaussian "signal" and a uniform "background" sample over [0, 10).
 
@@ -22,7 +20,7 @@ def make_signal_background(n_signal: int = 500, n_background: int = 1000, seed: 
     }
 
 
-def make_exclusion_curve(seed: int = 0) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def make_exclusion_curve(seed: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate a synthetic expected upper-limit curve with a +/-1 sigma band.
 

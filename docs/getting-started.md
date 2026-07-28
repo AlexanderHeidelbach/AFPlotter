@@ -26,7 +26,9 @@ Every plotter shares these (set as plain attributes):
 - `watermark`, `luminosity_value`, `luminosity_unit`
 - `savedir`, `savename`, `saveformat` (or `savepath` for a full explicit path)
 
-Rescale text sizes for a specific plot (e.g. for a presentation):
+Rescale text sizes for a specific plot — the default (36) is tuned for print
+figures; pass a smaller value for a more compact layout or a presentation
+slide with limited space:
 
 ```python
 plotter.set_matplotlibrc_params(text_size=24)

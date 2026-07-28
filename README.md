@@ -13,7 +13,7 @@ Or for local development:
 
     git clone https://github.com/AlexanderHeidelbach/AFPlotter.git
     cd AFPlotter
-    pip install -e ".[dev]"
+    uv sync --extra dev
 
 ## Quickstart
 

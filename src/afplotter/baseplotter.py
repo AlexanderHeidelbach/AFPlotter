@@ -351,7 +351,7 @@ class BasePlotter(ABC):
             style="italic",
             alpha=0.95,
             weight="bold",
-            fontsize=20,
+            fontsize=plt.rcParams["xtick.labelsize"],
         )
         ax.text(
             x + 0.130,
@@ -360,7 +360,7 @@ class BasePlotter(ABC):
             ha="left",
             transform=ax.transAxes,
             alpha=0.8,
-            fontsize=20,
+            fontsize=plt.rcParams["xtick.labelsize"],
         )
         if self.luminosity_value:
             ax.text(
@@ -370,7 +370,7 @@ class BasePlotter(ABC):
                 ha="left",
                 transform=ax.transAxes,
                 alpha=0.8,
-                fontsize=20,
+                fontsize=plt.rcParams["xtick.labelsize"],
             )
         if self.text:
             [
@@ -381,7 +381,7 @@ class BasePlotter(ABC):
                     ha="left",
                     transform=ax.transAxes,
                     alpha=0.8,
-                    fontsize=15,
+                    fontsize=plt.rcParams["legend.fontsize"],
                 )
                 for i, text in enumerate(self.text)
             ]
