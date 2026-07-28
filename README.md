@@ -15,6 +15,26 @@ Or for local development:
     cd AFPlotter
     uv sync --extra dev
 
+## Claude Code skill (optional)
+
+AFPlotter ships a Claude Code skill so you can ask Claude to make plots for
+you directly, using this library. Two ways to get it — pick whichever you
+prefer:
+
+**Claude Code plugin marketplace (recommended):**
+
+    claude marketplace add AlexanderHeidelbach/AFPlotter
+    claude plugin install afplotter
+
+Update later with `claude plugin update afplotter`.
+
+**One-command install** (installs both the package and the skill in one
+step, no `claude` CLI concepts required):
+
+    curl -sSL https://raw.githubusercontent.com/AlexanderHeidelbach/AFPlotter/main/install.sh | bash
+
+Re-run the same command any time to pick up updates.
+
 ## Quickstart
 
 ```python
