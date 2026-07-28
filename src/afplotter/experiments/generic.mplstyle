@@ -1,0 +1,21 @@
+
+#
+# Generic Style
+#
+# A neutral fallback: matplotlib's own defaults, plus a few generally useful
+# readability tweaks (no experiment-specific colors, fonts, or tick sizing).
+# Bundle your own .mplstyle and register it via afplotter.experiments.registry
+# for anything more specific.
+
+figure.facecolor: white
+axes.facecolor: white
+axes.grid: False
+
+legend.frameon: False
+
+xtick.direction: out
+ytick.direction: out
+xtick.minor.visible: True
+ytick.minor.visible: True
+
+axes.formatter.use_mathtext: True

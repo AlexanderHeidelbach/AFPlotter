@@ -11,3 +11,16 @@ venv/
 ENV/
 venv*
 env*
+
+# Build artifacts
+*.egg-info/
+build/
+dist/
+
+# Example outputs
+examples/output/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/

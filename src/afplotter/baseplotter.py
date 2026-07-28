@@ -1,14 +1,13 @@
-from typing import Any, Optional, Union, List, Tuple, Dict
+from typing import Any
 import os
 import numpy as np
 from abc import ABC
 from cycler import cycler
 import matplotlib.pyplot as plt
 
-PathType = Union[str, os.PathLike]
+from afplotter.experiments.context import get_experiment
 
-style = os.path.join(os.environ.get("ALPS_PATH", ""), "belle2_modern.mplstyle")
-plt.style.use(style)
+PathType = str | os.PathLike
 
 
 class KITColors:
@@ -31,6 +30,13 @@ class KITColors:
     grey = "#797979"  # type: str
     dark_grey = "#4e4e4e"  # type: str
 
+    lmu_green = "#00883A"  # R 0,   G 136, B 58
+    lmu_blue = "#0F1987"  # R 15,  G 25,  B 135
+    lmu_cyan = "#643BE3"  # R 100, G 59,  B 227
+    lmu_violet = "#8C4091"  # R 140, G 64,  B 145
+    lmu_red = "#D71919"  # R 215, G 25,  B 25
+    lmu_orange = "#F18700"  # R 241, G 135, B 0
+
     default_colors = [
         kit_green,
         kit_blue,
@@ -42,45 +48,68 @@ class KITColors:
         kit_purple,
         kit_brown,
         dark_grey,
-    ]  # type: List[str]
+    ]  # type: list[str]
 
 
 kit_color_cycler = cycler("color", KITColors.default_colors)
 
 
-def set_matplotlibrc_params() -> None:
+def set_matplotlibrc_params(text_size: int = 36) -> None:
     """
-    Sets default parameters in the matplotlibrc.
+    Sets default matplotlibrc parameters, scaled relative to a base text size.
+
+    :param text_size: Base font size in points that tick/axis/legend sizes
+        and geometry are derived from. Defaults to 36 (paper-ready — legible
+        after a figure is shrunk to fit a paper column).
     :return: None
     """
+    latex_text_size = text_size
+    tick_label_size = 0.8 * latex_text_size
+
+    major_tick_len = max(5, 0.25 * latex_text_size)
+    minor_tick_len = max(3, 0.12 * latex_text_size)
+    major_tick_w = max(1.0, 0.06 * latex_text_size)
+    minor_tick_w = max(0.8, 0.04 * latex_text_size)
+
     xtick = {
         "top": True,
         "minor.visible": True,
         "direction": "in",
-        "labelsize": 12,
+        "labelsize": tick_label_size,
+        "major.pad": 10,
+        "major.size": major_tick_len,
+        "minor.size": minor_tick_len,
+        "major.width": major_tick_w,
+        "minor.width": minor_tick_w,
     }
 
     ytick = {
         "right": True,
         "minor.visible": True,
         "direction": "in",
-        "labelsize": 12,
+        "labelsize": tick_label_size,
+        "major.size": major_tick_len,
+        "minor.size": minor_tick_len,
+        "major.width": major_tick_w,
+        "minor.width": minor_tick_w,
     }
 
     axes = {
-        "labelsize": "x-large",
+        "labelsize": latex_text_size,
         "prop_cycle": kit_color_cycler,
         "formatter.limits": (-4, 4),
         "formatter.use_mathtext": True,
-        "titlesize": "large",
+        "titlesize": latex_text_size,
         "labelpad": 4.0,
+        "linewidth": max(1.0, 0.05 * latex_text_size),
     }
-    lines = {
-        "lw": 1.5,
-    }
+
+    lines = {"lw": 1.5}
+
     legend = {
         "frameon": False,
-        "fontsize": "large",
+        "fontsize": latex_text_size * 0.6,
+        "title_fontsize": latex_text_size * 0.5,
     }
 
     plt.rc("lines", **lines)
@@ -91,7 +120,10 @@ def set_matplotlibrc_params() -> None:
 
     plt.rcParams.update(
         {
+            "font.size": latex_text_size,
             "figure.autolayout": True,
+            "savefig.dpi": 300,
+            "figure.dpi": 150,
         }
     )
 
@@ -100,9 +132,10 @@ class BasePlotter(ABC):
     """Abstract plotter class to set basic properties for specific plots"""
 
     def __init__(self) -> None:
+        get_experiment()
         set_matplotlibrc_params()
-        self._figsize: Tuple[int, int] = (12, 8)
-        self._label: Optional[Union[str, List[Optional[str]]]] = "label"
+        self._figsize: tuple[int, int] = (12, 8)
+        self._label: str | list[str | None] | None = "label"
         self._xlabel: str = "x"
         self._ylabel: str = "y"
         self._watermark: str = "(own work)"
@@ -111,33 +144,33 @@ class BasePlotter(ABC):
         self._log: bool = False
         self._xlog: bool = False
         self._legend_ncol: int = 4
-        self._legend_title: Optional[str] = None
+        self._legend_title: str | None = None
         self._legend_loc: str = "best"
-        self._xlim: Optional[Tuple[float, float]] = None
-        self._ylim: Optional[Tuple[float, float]] = None
+        self._xlim: tuple[float, float] | None = None
+        self._ylim: tuple[float, float] | None = None
         self._savedir: PathType = "./"
         self._saveformat: str = "png"
         self._savename: str = "plot"
         self._savepath: str = ""
         self._watermark_position: tuple = (0.033, 0.915)
 
-        self.text: List[str] = []
-        self.generic_text: List[dict] = []
+        self.text: list[str] = []
+        self.generic_text: list[dict] = []
 
     @property
-    def figsize(self) -> Tuple[int, int]:
+    def figsize(self) -> tuple[int, int]:
         return self._figsize
 
     @figsize.setter
-    def figsize(self, figsize: Tuple[int, int]) -> None:
+    def figsize(self, figsize: tuple[int, int]) -> None:
         self._figsize = figsize
 
     @property
-    def label(self) -> Optional[Union[str, List[Optional[str]]]]:
+    def label(self) -> str | list[str | None] | None:
         return self._label
 
     @label.setter
-    def label(self, label: Optional[Union[str, List[Optional[str]]]]) -> None:
+    def label(self, label: str | list[str | None] | None) -> None:
         self._label = label
 
     @property
@@ -182,7 +215,7 @@ class BasePlotter(ABC):
 
     @property
     def luminosity(self) -> str:
-        return f"$\\int\\,L\\,\\mathrm{{dt}}\\;=\\;${self.luminosity_value:.2f}$\\; \\mathrm{{{self.luminosity_unit}}}^{{-1}}$"
+        return f"$\\int\\,L\\,\\mathrm{{d}}t\\;=\\;${self.luminosity_value:.0f}$\\; \\mathrm{{{self.luminosity_unit}}}^{{-1}}$"
 
     @property
     def legend_ncol(self) -> int:
@@ -193,7 +226,7 @@ class BasePlotter(ABC):
         self._legend_ncol = legend_ncol
 
     @property
-    def legend_title(self) -> Optional[str]:
+    def legend_title(self) -> str | None:
         return self._legend_title
 
     @legend_title.setter
@@ -225,19 +258,19 @@ class BasePlotter(ABC):
         self._xlog = log
 
     @property
-    def xlim(self) -> Optional[Tuple[float, float]]:
+    def xlim(self) -> tuple[float, float] | None:
         return self._xlim
 
     @xlim.setter
-    def xlim(self, xlim: Tuple[float, float]) -> None:
+    def xlim(self, xlim: tuple[float, float]) -> None:
         self._xlim = xlim
 
     @property
-    def ylim(self) -> Optional[Tuple[float, float]]:
+    def ylim(self) -> tuple[float, float] | None:
         return self._ylim
 
     @ylim.setter
-    def ylim(self, ylim: Tuple[float, float]) -> None:
+    def ylim(self, ylim: tuple[float, float]) -> None:
         self._ylim = ylim
 
     @property
@@ -282,10 +315,19 @@ class BasePlotter(ABC):
     def watermark_position(self, watermark_position: tuple) -> None:
         self._watermark_position = watermark_position
 
+    def set_matplotlibrc_params(self, text_size: int = 36) -> None:
+        """
+        Rescale matplotlib rcParams for this plot (e.g. for a presentation-sized figure).
+
+        :param text_size: Base font size in points. Defaults to 36 (paper-ready).
+        :return: None
+        """
+        set_matplotlibrc_params(text_size)
+
     def add_text(self, text: str) -> None:
         self.text.append(text)
 
-    def add_generic_text(self, **text_kwargs: Dict[Any, Any]) -> None:
+    def add_generic_text(self, **text_kwargs: dict[Any, Any]) -> None:
         self.generic_text.append(text_kwargs)
 
     def _get_savestring(self) -> PathType:
@@ -303,13 +345,13 @@ class BasePlotter(ABC):
         ax.text(
             x,
             y,
-            "Belle II",
+            get_experiment().labels.get("experiment", ""),
             ha="left",
             transform=ax.transAxes,
             style="italic",
             alpha=0.95,
             weight="bold",
-            fontsize=20,
+            fontsize=plt.rcParams["xtick.labelsize"],
         )
         ax.text(
             x + 0.130,
@@ -318,17 +360,17 @@ class BasePlotter(ABC):
             ha="left",
             transform=ax.transAxes,
             alpha=0.8,
-            fontsize=20,
+            fontsize=plt.rcParams["xtick.labelsize"],
         )
         if self.luminosity_value:
             ax.text(
                 x,
-                y - 0.07,
+                y - 0.06,
                 self.luminosity,
                 ha="left",
                 transform=ax.transAxes,
                 alpha=0.8,
-                fontsize=15,
+                fontsize=plt.rcParams["xtick.labelsize"],
             )
         if self.text:
             [
@@ -339,7 +381,7 @@ class BasePlotter(ABC):
                     ha="left",
                     transform=ax.transAxes,
                     alpha=0.8,
-                    fontsize=15,
+                    fontsize=plt.rcParams["legend.fontsize"],
                 )
                 for i, text in enumerate(self.text)
             ]
@@ -350,10 +392,10 @@ class BasePlotter(ABC):
 
     def _add_axislabels(
         self,
-        xax: Optional[plt.Axes] = None,
-        yax: Optional[plt.Axes] = None,
-        xlabel: Optional[str] = None,
-        ylabel: Optional[str] = None,
+        xax: plt.Axes | None = None,
+        yax: plt.Axes | None = None,
+        xlabel: str | None = None,
+        ylabel: str | None = None,
     ) -> None:
         """Set axis labels for histogram plots
 
@@ -383,7 +425,7 @@ class BasePlotter(ABC):
             yax.set_ylabel(label)
 
     def _set_axislimits(
-        self, ax: plt.Axes, ylim: Optional[Tuple[float, float]] = None
+        self, ax: plt.Axes, ylim: tuple[float, float] | None = None
     ) -> None:
         """Set axis limits depending on number of legend and text lines"""
         xlim = self.xlim
@@ -406,7 +448,7 @@ class BasePlotter(ABC):
         else:
             ax.set_ylim(bottom=ylim[0], top=ylim[1])
 
-    def _add_legend(self, ax: Union[List[plt.Axes], plt.Axes]) -> None:
+    def _add_legend(self, ax: list[plt.Axes] | plt.Axes) -> None:
         """Addition of legend with respect to number of labels."""
         if not isinstance(ax, list):
             ax = [ax]

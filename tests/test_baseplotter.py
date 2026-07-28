@@ -1,0 +1,177 @@
+import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pytest
+
+from afplotter.baseplotter import BasePlotter, KITColors
+from afplotter.experiments.context import set_experiment
+
+
+class ConcretePlotter(BasePlotter):
+    """BasePlotter is abstract only in intent (ABC with no abstract methods); subclass for testing."""
+
+
+def test_baseplotter_constructs_without_env_vars(monkeypatch):
+    monkeypatch.delenv("ALPS_PATH", raising=False)
+    plotter = ConcretePlotter()
+    assert plotter.figsize == (12, 8)
+
+
+def test_default_properties():
+    plotter = ConcretePlotter()
+    assert plotter.xlabel == "x"
+    assert plotter.ylabel == "y"
+    assert plotter.log is False
+    assert plotter.legend_ncol == 4
+
+
+def test_property_setters_roundtrip():
+    plotter = ConcretePlotter()
+    plotter.figsize = (6, 4)
+    plotter.xlabel = "p_T"
+    plotter.log = True
+    plotter.xlim = (0.0, 10.0)
+    assert plotter.figsize == (6, 4)
+    assert plotter.xlabel == "p_T"
+    assert plotter.log is True
+    assert plotter.xlim == (0.0, 10.0)
+
+
+def test_savedir_creates_directory(tmp_path):
+    plotter = ConcretePlotter()
+    target = tmp_path / "plots"
+    plotter.savedir = str(target)
+    assert target.exists()
+
+
+def test_get_savestring_uses_savedir_savename_saveformat(tmp_path):
+    plotter = ConcretePlotter()
+    plotter.savedir = str(tmp_path)
+    plotter.savename = "myplot"
+    plotter.saveformat = "pdf"
+    assert plotter._get_savestring() == os.path.join(str(tmp_path), "myplot.pdf")
+
+
+def test_get_savestring_prefers_explicit_savepath(tmp_path):
+    plotter = ConcretePlotter()
+    plotter.savepath = str(tmp_path / "explicit.png")
+    assert plotter._get_savestring() == str(tmp_path / "explicit.png")
+
+
+def test_add_text_and_generic_text():
+    plotter = ConcretePlotter()
+    plotter.add_text("extra info")
+    plotter.add_generic_text(x=0.1, y=0.1, s="hello")
+    assert plotter.text == ["extra info"]
+    assert plotter.generic_text == [{"x": 0.1, "y": 0.1, "s": "hello"}]
+
+
+def test_luminosity_formats_with_zero_decimals():
+    plotter = ConcretePlotter()
+    plotter.luminosity_value = 408.11
+    plotter.luminosity_unit = "fb"
+    assert "408$" in plotter.luminosity
+    assert "408.11" not in plotter.luminosity
+
+
+def test_add_text_to_plot_renders_watermark_and_luminosity():
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    plotter.luminosity_value = 408.0
+    plotter.add_text("(Preliminary)")
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    texts = {t.get_text(): t for t in ax.texts}
+    assert "Belle II" in texts
+    assert plotter.watermark in texts
+    assert plotter.luminosity in texts
+    assert texts[plotter.luminosity].get_fontsize() == pytest.approx(plt.rcParams["xtick.labelsize"])
+    assert "(Preliminary)" in texts
+    plt.close(fig)
+
+
+def test_add_text_to_plot_experiment_name_follows_set_experiment():
+    """The big experiment-name text must track set_experiment(), not be hardcoded."""
+    set_experiment("Generic")
+    plotter = ConcretePlotter()
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    texts = [t.get_text() for t in ax.texts]
+    assert "Belle II" not in texts
+    plt.close(fig)
+
+    set_experiment("BelleII")
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    texts = [t.get_text() for t in ax.texts]
+    assert "Belle II" in texts
+    plt.close(fig)
+
+
+def test_set_axislimits_linear_expands_ylim_for_legend():
+    plotter = ConcretePlotter()
+    plotter.legend_ncol = 2
+    fig, ax = plt.subplots()
+    ax.plot([0, 1], [0, 1])
+    original_top = ax.get_ylim()[1]
+    plotter._set_axislimits(ax=ax)
+    assert ax.get_ylim()[1] > original_top
+    plt.close(fig)
+
+
+def test_set_axislimits_respects_explicit_ylim():
+    plotter = ConcretePlotter()
+    fig, ax = plt.subplots()
+    ax.plot([0, 1], [0, 1])
+    plotter._set_axislimits(ax=ax, ylim=(0.0, 5.0))
+    assert ax.get_ylim() == (0.0, 5.0)
+    plt.close(fig)
+
+
+def test_add_legend_combines_multiple_axes():
+    plotter = ConcretePlotter()
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    ax1.plot([0, 1], [0, 1], label="a")
+    ax2.plot([0, 1], [1, 0], label="b")
+    plotter._add_legend(ax=[ax1, ax2])
+    legend_texts = [t.get_text() for t in ax1.get_legend().get_texts()]
+    assert legend_texts == ["a", "b"]
+    plt.close(fig)
+
+
+def test_kit_colors_defines_default_colors():
+    assert len(KITColors.default_colors) == 10
+    assert KITColors.kit_green == "#009682"
+
+
+def test_kit_colors_defines_lmu_colors():
+    assert KITColors.lmu_green == "#00883A"
+    assert KITColors.lmu_blue == "#0F1987"
+    assert KITColors.lmu_orange == "#F18700"
+
+
+def test_set_matplotlibrc_params_default_text_size_36():
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params()  # default text_size=36
+    assert plt.rcParams["xtick.labelsize"] == pytest.approx(28.8)  # 0.8 * 36
+    assert plt.rcParams["axes.labelsize"] == pytest.approx(36.0)
+    assert plt.rcParams["legend.fontsize"] == pytest.approx(21.6)  # 36 * 0.6
+    assert plt.rcParams["legend.title_fontsize"] == pytest.approx(18.0)  # 36 * 0.5
+    assert plt.rcParams["font.size"] == pytest.approx(36.0)
+    assert plt.rcParams["savefig.dpi"] == pytest.approx(300.0)
+
+
+def test_set_matplotlibrc_params_scales_with_text_size():
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params(text_size=40)
+    assert plt.rcParams["xtick.labelsize"] == 32.0  # 0.8 * 40
+    assert plt.rcParams["axes.labelsize"] == 40.0
+    assert plt.rcParams["legend.fontsize"] == 24.0  # 40 * 0.6
+
+
+def test_module_level_set_matplotlibrc_params_is_directly_callable():
+    from afplotter.baseplotter import set_matplotlibrc_params
+
+    set_matplotlibrc_params(text_size=25)
+    assert plt.rcParams["font.size"] == 25.0

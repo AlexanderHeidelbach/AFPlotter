@@ -1,16 +1,16 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable
 from matplotlib import pyplot as plt  # type: ignore
 from matplotlib.colors import to_hex  # type: ignore
 import numpy as np  # type: ignore
 import seaborn as sns  # type: ignore
 
 from afplotter.baseplotter import BasePlotter
-from afplotter.genericplot import GenericPlot
+from afplotter.genericplot import GenericPlot, InsetPlot
 from afplotter.utilities.histogram import Histogram
 
 
-def poisson_ratio(b: np.ndarray, a: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def poisson_ratio(b: np.ndarray, a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Compute ratio b/a with propagated Poisson errors for arrays.
 
@@ -73,14 +73,14 @@ class HistogramVariable:
 class HistogramPlot:
     def __init__(self, histogram: Histogram) -> None:
         self.histogram = histogram
-        self._ax: Optional[plt.Axes] = None
+        self._ax: plt.Axes | None = None
         self._stacked: bool = False
         self._sig_extra: bool = False
         self._uncertainty: bool = False
         self._data_only: bool = False
-        self._data_hist: Optional[Histogram] = None
+        self._data_hist: Histogram | None = None
         self._linewidth: float = 1.0
-        self._edgecolor: Optional[str] = "black"
+        self._edgecolor: str | None = "black"
 
         self._density: bool = False
         self._log: bool = False
@@ -143,7 +143,7 @@ class HistogramPlot:
         self._data_only = data
 
     @property
-    def data_hist(self) -> Optional[Histogram]:
+    def data_hist(self) -> Histogram | None:
         return self._data_hist
 
     @data_hist.setter
@@ -159,15 +159,15 @@ class HistogramPlot:
         self._linewidth = width
 
     @property
-    def edgecolor(self) -> Optional[str]:
+    def edgecolor(self) -> str | None:
         return self._edgecolor
 
     @edgecolor.setter
-    def edgecolor(self, color: Optional[str]) -> None:
+    def edgecolor(self, color: str | None) -> None:
         self._edgecolor = color
 
     @staticmethod
-    def hatches(n: int) -> List[str]:
+    def hatches(n: int) -> list[str]:
         hatches_list = [
             "///",
             r"\\\ ",
@@ -193,7 +193,7 @@ class HistogramPlot:
         return hex_colors
 
     @staticmethod
-    def std_colors(n: int) -> List[str]:
+    def std_colors(n: int) -> list[str]:
         colormap = dict(plt.rcParams)["axes.prop_cycle"].by_key()["color"]
         return [colormap[i % len(colormap)] for i in range(n)]
 
@@ -239,7 +239,7 @@ class HistogramPlot:
             )
 
     def plot_step(self, sig_extra: bool = False) -> None:
-        hatches: Union[List[str], List[None], List[Optional[str]]] = [None]
+        hatches: list[str] | list[None] | list[str | None] = [None]
         if not sig_extra:
             centers = self.histogram.get_bin_centers()
             weights = self.histogram.get_bin_counts()
@@ -352,14 +352,14 @@ class Histogram2DPlot:
     def __init__(self, xhistogram: Histogram, yhistogram: Histogram) -> None:
         self.xhistogram = xhistogram
         self.yhistogram = yhistogram
-        self._ax: Optional[plt.Axes] = None
+        self._ax: plt.Axes | None = None
 
         self._density: bool = False
         self._log: bool = False
 
         self._cmap: str = "viridis"
-        self._cmin: Optional[float] = None
-        self._cmax: Optional[float] = None
+        self._cmin: float | None = None
+        self._cmax: float | None = None
         self._cbar_label: str = "Entries"
         self._norm = "linear"
 
@@ -405,19 +405,19 @@ class Histogram2DPlot:
         self._norm = norm
 
     @property
-    def cmin(self) -> Optional[float]:
+    def cmin(self) -> float | None:
         return self._cmin
 
     @cmin.setter
-    def cmin(self, cmin: Optional[float]) -> None:
+    def cmin(self, cmin: float | None) -> None:
         self._cmin = cmin
 
     @property
-    def cmax(self) -> Optional[float]:
+    def cmax(self) -> float | None:
         return self._cmax
 
     @cmax.setter
-    def cmax(self, cmax: Optional[float]) -> None:
+    def cmax(self, cmax: float | None) -> None:
         self._cmax = cmax
 
     @property
@@ -481,10 +481,11 @@ class HistogramPlotter(BasePlotter):
         super().__init__()
         self.histplot = histplot
         self.variable = variable
-        self.generic_plots: List[GenericPlot] = []
-        self.pull_plots: List[GenericPlot] = []
-        self.pull_ylim: Optional[Tuple[float, float]] = None
-        self.color_map_kwargs: Dict[str, Any] = {}
+        self.generic_plots: list[GenericPlot] = []
+        self._insets: list[InsetPlot] = []
+        self.pull_plots: list[GenericPlot] = []
+        self.pull_ylim: tuple[float, float] | None = None
+        self.color_map_kwargs: dict[str, Any] = {}
         self.pull_label: str = "Pull"
 
         self.log = self.histplot.log
@@ -532,6 +533,31 @@ class HistogramPlotter(BasePlotter):
 
     def add_generic_plot(self, generic_plot: GenericPlot) -> None:
         self.generic_plots.append(generic_plot)
+
+    def add_inset(
+        self,
+        xlim: tuple[float, float],
+        ylim: tuple[float, float] | None = None,
+        plots: list[Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Queue an inset axes replaying this plotter's histogram (and any
+        generic overlays) zoomed to xlim/ylim.
+
+        :param xlim: Data x-limits for the inset.
+        :param ylim: Optional data y-limits for the inset.
+        :param plots: Objects to replay in the inset (must expose an `ax`
+            setter and a no-argument `plot()`, as both HistogramPlot and
+            GenericPlot do); defaults to this plotter's histogram plus any
+            generic overlays.
+        :param kwargs: Forwarded to InsetPlot (width, height, loc, title,
+            mark_region, mark_kwargs, tick_labelsize, title_fontsize, bbox_to_anchor).
+        :return: None
+        """
+        if plots is None:
+            plots = [self.histplot] + list(self.generic_plots)
+        self._insets.append(InsetPlot(plots=plots, xlim=xlim, ylim=ylim, **kwargs))
 
     def add_pull(
         self,
@@ -647,7 +673,7 @@ class HistogramPlotter(BasePlotter):
         show_sigmas: bool = True,
         max_sigma: float = 3.0,
         ratio: bool = False,
-        ylim: Optional[Tuple[float, float]] = None,
+        ylim: tuple[float, float] | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -784,7 +810,7 @@ class HistogramPlotter(BasePlotter):
         cbar = plt.colorbar(sm, ax=ax)
         cbar.set_label(self.color_map_kwargs["label"])
 
-    def plot(self, save: bool = False) -> Tuple[plt.Axes, Optional[plt.Axes]]:
+    def plot(self, save: bool = False) -> tuple[plt.Axes, plt.Axes | None]:
         if self.pull_plots:
             fig = plt.figure(figsize=(self.figsize[0], 1.5 * self.figsize[1]))
             ax = fig.add_subplot(4, 1, (1, 3), xticklabels=[])
@@ -801,6 +827,9 @@ class HistogramPlotter(BasePlotter):
         for generic_plot in self.generic_plots:
             generic_plot.ax = ax
             ax = generic_plot.plot()
+
+        for inset in self._insets:
+            inset.plot(parent_ax=ax)
 
         self.xlim = (
             np.min(self.histplot.histogram.binning),
@@ -853,7 +882,7 @@ class Histogram2DPlotter(BasePlotter):
         self.histplot = histplot
         self.xvariable = xvariable
         self.yvariable = yvariable
-        self.generic_plots: List[GenericPlot] = []
+        self.generic_plots: list[GenericPlot] = []
         self.log = self.histplot.log
 
     @property
