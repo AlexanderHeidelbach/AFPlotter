@@ -11,6 +11,11 @@ def sample_lazyframe():
     return pl.LazyFrame({"pt": [1.0, 5.0, 10.0], "eta": [0.1, -0.5, 2.5], "flag": [True, False, True]})
 
 
+@pytest.fixture
+def nullable_lazyframe():
+    return pl.LazyFrame({"x": [1.0, float("nan"), None, 4.0]})
+
+
 class TestSelectionParser:
     def test_simple_comparison(self, sample_lazyframe):
         expr = SelectionParser("pt > 3").parse()
@@ -44,6 +49,36 @@ class TestSelectionParser:
     def test_non_string_input_raises_type_error(self):
         with pytest.raises(TypeError, match="Input must be a string"):
             SelectionParser(123)  # type: ignore[arg-type]
+
+    def test_chained_comparison_ands_pairwise(self, sample_lazyframe):
+        expr = SelectionParser("-2 < eta < 2").parse()
+        result = sample_lazyframe.filter(expr).collect()
+        assert result["eta"].to_list() == [0.1, -0.5]
+
+    def test_is_none_matches_null(self, nullable_lazyframe):
+        expr = SelectionParser("x is None").parse()
+        result = nullable_lazyframe.filter(expr).collect()
+        assert result["x"].to_list() == [None]
+
+    def test_is_nan_matches_nan(self, nullable_lazyframe):
+        expr = SelectionParser("x is NaN").parse()
+        result = nullable_lazyframe.filter(expr).collect()
+        assert len(result) == 1
+        assert result["x"][0] != result["x"][0]  # NaN
+
+    def test_is_not_none_excludes_null(self, nullable_lazyframe):
+        expr = SelectionParser("x is not None").parse()
+        result = nullable_lazyframe.filter(expr).collect()
+        assert result["x"].to_list()[:1] == [1.0]
+        assert None not in result["x"].to_list()
+        assert len(result) == 3
+
+    def test_is_not_nan_excludes_nan(self, nullable_lazyframe):
+        # NaN-ness is null-propagating (matches Polars' own is_nan/is_not_nan and every
+        # other comparison in this parser), so the null row is excluded too, not kept.
+        expr = SelectionParser("x is not NaN").parse()
+        result = nullable_lazyframe.filter(expr).collect()
+        assert result["x"].to_list() == [1.0, 4.0]
 
 
 class TestSelectionOperator:

@@ -27,7 +27,8 @@ class SelectionParser:
         ast.LtE: operator.le,
         ast.And: operator.and_,
         ast.Or: operator.or_,
-        ast.Is: lambda a, b: a.is_null() if b != b else a.is_not_null(),
+        ast.Is: lambda a, b: a.is_nan() if b != b else a.is_null(),
+        ast.IsNot: lambda a, b: ~a.is_nan() if b != b else a.is_not_null(),
     }
 
     def __init__(self, query_input: str):
@@ -54,14 +55,13 @@ class SelectionParser:
             return self._parse_expr(node.left) | self._parse_expr(node.right)
 
         elif isinstance(node, ast.Compare):
-            left = self._parse_expr(node.left, in_lhs_of_comparison=True)
-            result = left
-            for op, comp in zip(node.ops, node.comparators):
-                right = self._parse_expr(comp)
-                if isinstance(op, ast.Is):
-                    return self.OPS[type(op)](left, right)
-                result = self.OPS[type(op)](result, right)
-            return result
+            operands = [self._parse_expr(node.left, in_lhs_of_comparison=True)]
+            operands.extend(self._parse_expr(comparator) for comparator in node.comparators)
+            comparisons = (
+                self.OPS[type(op)](operands[i], operands[i + 1])
+                for i, op in enumerate(node.ops)
+            )
+            return reduce(operator.and_, comparisons)
 
         elif isinstance(node, ast.Name):
             if node.id == "NaN":
