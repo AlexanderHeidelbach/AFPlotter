@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "A standalone HEP plotting library"
 authors = [
     {name = "Alexander Heidelbach", email = "alexander.heidelbach@kit.edu"},
+    {name = "Frederik Schmitt", email = "frederik.schmitt@kit.edu"},
 ]
 dependencies = [
     "matplotlib",
