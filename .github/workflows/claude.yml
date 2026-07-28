@@ -1,0 +1,29 @@
+name: Claude Code Action
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-response:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # By default, only users with write access to this repo can
+          # trigger a run by mentioning @claude (the action's own default
+          # gate — verified in anthropics/claude-code-action's docs). Do
+          # NOT set allowed_non_write_users: true; that removes this gate
+          # and is called out by the action's own docs as a real
+          # prompt-injection risk on a public repo.
+          #
+          # To let a specific trusted student trigger this directly,
+          # without granting them full collaborator/write access, add:
+          # include_comments_by_actor: "username1,username2"
