@@ -1,6 +1,6 @@
 from collections import defaultdict
 import numpy as np  # type: ignore
-from typing import Any, Dict, List, Optional, Union, Tuple
+from typing import Any
 from dataclasses import dataclass, field, asdict
 
 
@@ -8,12 +8,12 @@ from dataclasses import dataclass, field, asdict
 class HistogramEntry:
     name: str = ""
     latex_name: str = ""
-    array: Optional[np.ndarray] = None
+    array: np.ndarray | None = None
     counts: np.ndarray = field(default_factory=lambda: np.array([]))
     errors: np.ndarray = field(default_factory=lambda: np.array([]))
-    weight: Union[float, np.ndarray] = 1.0
-    color: Optional[str] = None
-    hatch: Optional[str] = None
+    weight: float | np.ndarray = 1.0
+    color: str | None = None
+    hatch: str | None = None
     show_label: bool = True
     type: str = "entry"
 
@@ -44,7 +44,7 @@ class HistogramEntry:
         return self
 
     @property
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Converts the instance to a serializable dictionary."""
         data = asdict(self)  # Convert to dictionary
         # Convert numpy arrays to lists
@@ -54,7 +54,7 @@ class HistogramEntry:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "HistogramEntry":
+    def from_dict(cls, data: dict[str, Any]) -> "HistogramEntry":
         """Creates an instance from a dictionary."""
         # Convert lists back to numpy arrays
         for key in ["array", "counts", "errors"]:
@@ -65,7 +65,7 @@ class HistogramEntry:
     def get_weights(self, pot: float = 1.0) -> np.ndarray:
         return np.ones_like(self.array) * self.weight**pot
 
-    def compute_counts(self, binning: Union[np.ndarray, int]) -> np.ndarray:
+    def compute_counts(self, binning: np.ndarray | int) -> np.ndarray:
         assert self.array is not None, (
             f"The array for the HistogramEntry {self.name} is not set."
             + "Either this method was called too early or the array was already cleared."
@@ -92,13 +92,13 @@ class HistogramEntry:
 
 class Histogram:
     def __init__(self) -> None:
-        self._binning: Optional[Union[np.ndarray, int]] = None
-        self.entries: Dict[str, HistogramEntry] = defaultdict(lambda: HistogramEntry())
-        self.signal: Dict[str, HistogramEntry] = defaultdict(lambda: HistogramEntry())
-        self.metadata: Dict[Any, Any] = {}
+        self._binning: np.ndarray | int | None = None
+        self.entries: dict[str, HistogramEntry] = defaultdict(lambda: HistogramEntry())
+        self.signal: dict[str, HistogramEntry] = defaultdict(lambda: HistogramEntry())
+        self.metadata: dict[Any, Any] = {}
 
     @property
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         binning = (
             self.binning
             if isinstance(self.binning, int)
@@ -115,7 +115,7 @@ class Histogram:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Histogram":
+    def from_dict(cls, data: dict[str, Any]) -> "Histogram":
         instance = cls()
         instance.binning = (
             np.array(data["binning"]) if data["binning"] is not None else None
@@ -132,11 +132,11 @@ class Histogram:
         return instance
 
     @property
-    def binning(self) -> Optional[Union[np.ndarray, int]]:
+    def binning(self) -> np.ndarray | int | None:
         return self._binning
 
     @binning.setter
-    def binning(self, bins: Union[np.ndarray, int]) -> None:
+    def binning(self, bins: np.ndarray | int) -> None:
         self._binning = bins
 
     @property
@@ -144,7 +144,7 @@ class Histogram:
         return self.metadata.get("column_name", "")
 
     @property
-    def filters(self) -> List[Any]:
+    def filters(self) -> list[Any]:
         return self.metadata.get("filters", [])
 
     def add_entry(self, entry: HistogramEntry, clear: bool = False) -> None:
@@ -179,11 +179,11 @@ class Histogram:
 
     def sum_entries(
         self,
-        entries: List[str],
+        entries: list[str],
         name: str = "",
         latex_name: str = "",
-        color: Optional[str] = None,
-        hatch: Optional[str] = None,
+        color: str | None = None,
+        hatch: str | None = None,
         type: str = "entry",
     ) -> None:
         new_entry = HistogramEntry(
@@ -198,16 +198,16 @@ class Histogram:
             for entry_name in entries:
                 self.remove_entry(entry_name)
 
-    def get_data(self) -> List[Optional[np.ndarray]]:
+    def get_data(self) -> list[np.ndarray | None]:
         return list(entry.array for entry in self.entries.values())
 
-    def get_signal_data(self) -> List[Optional[np.ndarray]]:
+    def get_signal_data(self) -> list[np.ndarray | None]:
         return list(entry.array for entry in self.signal.values())
 
-    def get_names(self) -> List[str]:
+    def get_names(self) -> list[str]:
         return list(entry.name for entry in self.entries.values())
 
-    def get_latex_names(self) -> Optional[List[str]]:
+    def get_latex_names(self) -> list[str] | None:
         if any(not entry.show_label for entry in self.entries.values()):
             return None
         else:
@@ -216,25 +216,25 @@ class Histogram:
                 for entry in self.entries.values()
             )
 
-    def get_signal_names(self) -> List[str]:
+    def get_signal_names(self) -> list[str]:
         return list(entry.name for entry in self.signal.values())
 
-    def get_signal_latex_names(self) -> List[str]:
+    def get_signal_latex_names(self) -> list[str]:
         return list(
             entry.latex_name if entry.latex_name else entry.name
             for entry in self.signal.values()
         )
 
-    def get_colors(self) -> List[Optional[str]]:
+    def get_colors(self) -> list[str | None]:
         return list(entry.color for entry in self.entries.values())
 
-    def get_signal_colors(self) -> List[Optional[str]]:
+    def get_signal_colors(self) -> list[str | None]:
         return list(entry.color for entry in self.signal.values())
 
-    def get_hatches(self) -> List[Optional[str]]:
+    def get_hatches(self) -> list[str | None]:
         return list(entry.hatch for entry in self.entries.values())
 
-    def get_bin_centers(self) -> List[np.ndarray]:
+    def get_bin_centers(self) -> list[np.ndarray]:
         assert not isinstance(self.binning, int)
         assert self.binning is not None
 
@@ -254,7 +254,7 @@ class Histogram:
     def get_bin_count_for_entry(self, entry: HistogramEntry) -> np.ndarray:
         return entry.counts
 
-    def get_bin_counts(self) -> List[np.ndarray]:
+    def get_bin_counts(self) -> list[np.ndarray]:
         return [self.get_bin_count_for_entry(entry) for entry in self.entries.values()]
 
     def get_total_bin_count(self) -> np.ndarray:
@@ -266,7 +266,7 @@ class Histogram:
     def get_bin_error_for_entry(self, entry: HistogramEntry) -> np.ndarray:
         return entry.errors
 
-    def get_bin_errors(self) -> List[np.ndarray]:
+    def get_bin_errors(self) -> list[np.ndarray]:
         return [
             self.get_bin_error_for_entry(entry=entry) for entry in self.entries.values()
         ]
@@ -284,7 +284,7 @@ class Histogram:
 
     def get_signal_bin_count_for_component(
         self, entry: HistogramEntry
-    ) -> Tuple[np.ndarray, float]:
+    ) -> tuple[np.ndarray, float]:
         bin_count = self.get_bin_count_for_entry(entry=entry).astype(float)
         scaling = 1
         if self.entries:
@@ -296,8 +296,8 @@ class Histogram:
 
         return bin_count, scaling
 
-    def get_signal_bin_counts(self) -> List[np.ndarray]:
-        signal_bin_counts = []  # type: List[np.ndarray]
+    def get_signal_bin_counts(self) -> list[np.ndarray]:
+        signal_bin_counts = []  # type: list[np.ndarray]
         for entry in self.signal.values():
             bin_count, _ = self.get_signal_bin_count_for_component(entry=entry)
             signal_bin_counts.append(bin_count)
@@ -313,7 +313,7 @@ class Histogram:
         _, scaling = self.get_signal_bin_count_for_component(entry=entry)
         return scaling * self.get_bin_error_for_entry(entry=entry)
 
-    def get_signal_bin_errors(self) -> List[np.ndarray]:
+    def get_signal_bin_errors(self) -> list[np.ndarray]:
         return [
             self.get_signal_bin_error_for_entry(entry=entry)
             for entry in self.signal.values()
@@ -322,7 +322,7 @@ class Histogram:
     def get_scale(self) -> float:
         return np.max([self.get_total_scale(), self.get_total_signal_scale()])
 
-    def order_entries(self, entry_name: List[str]) -> None:
+    def order_entries(self, entry_name: list[str]) -> None:
         if len(entry_name) != len(self.entries):
             raise ValueError(
                 "The number of entries to order does not match the number of entries."

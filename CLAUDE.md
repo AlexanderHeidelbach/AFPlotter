@@ -57,8 +57,8 @@ limits) chain `add_generic_plot(...)` / `add_generic_text(...)` / `add_inset(...
 
 ## Conventions
 
-- **Python 3.8 compatible typing**: `Optional[X]`, `List[X]`, `Dict[K, V]`, `Tuple[X, Y]` from
-  `typing`. No bare `X | Y`, no builtin generics.
+- **Python 3.10+ typing**: native `X | Y` unions and builtin generics (`list[X]`, `dict[K, V]`,
+  `tuple[X, Y]`) — no `typing.Optional`/`List`/`Dict`/`Tuple`/`Union` imports.
 - **reST docstrings** (`:param:` / `:return:`) on public functions and classes.
 - **No import-time side effects** that touch the filesystem or env vars. `import afplotter` must
   succeed in a bare environment — `tests/test_packaging.py` guards this as a regression test.
@@ -111,7 +111,7 @@ Open follow-ups:
   built in. Register your own via `afplotter.experiments.registry.register(...)` rather than adding
   more built-ins for experiments this repo's maintainer isn't part of.
 - `importlib_resources` is declared as a runtime dependency but never imported — drop it.
-- `requires-python = ">=3.8"` is untested; modern polars/numpy/matplotlib no longer ship 3.8
-  wheels. Either add a low-version CI job or raise the floor to what's actually supported.
+- `requires-python = ">=3.10"` is exercised by CI (single version, no matrix) — see
+  `.github/workflows/ci.yml`.
 - A few tests in `tests/test_histogramplot.py` assert only "didn't crash" — see the testing
   philosophy above.

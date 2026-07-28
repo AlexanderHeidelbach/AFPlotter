@@ -1,8 +1,7 @@
-from typing import Dict
 
 from afplotter.experiments.experiment import Experiment
 
-EXPERIMENTS: Dict[str, Experiment] = {}
+EXPERIMENTS: dict[str, Experiment] = {}
 _LOADED = False
 
 

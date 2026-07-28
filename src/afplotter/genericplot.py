@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
@@ -11,10 +11,10 @@ class GenericPlot:
         self.plotmethod = plotmethod
         self.args = args
         self.kwargs = kwargs
-        self._ax: Optional[plt.Axes] = None
+        self._ax: plt.Axes | None = None
 
     @property
-    def ax(self) -> Optional[plt.Axes]:
+    def ax(self) -> plt.Axes | None:
         return self._ax
 
     @ax.setter
@@ -35,19 +35,19 @@ class InsetPlot:
 
     def __init__(
         self,
-        plots: List[Any],
-        xlim: Tuple[float, float],
-        ylim: Optional[Tuple[float, float]] = None,
+        plots: list[Any],
+        xlim: tuple[float, float],
+        ylim: tuple[float, float] | None = None,
         width: str = "38%",
         height: str = "38%",
         loc: str = "upper center",
         borderpad: float = 1.0,
-        title: Optional[str] = None,
+        title: str | None = None,
         mark_region: bool = True,
-        mark_kwargs: Optional[Dict[str, Any]] = None,
+        mark_kwargs: dict[str, Any] | None = None,
         tick_labelsize: float = 8,
         title_fontsize: float = 15,
-        bbox_to_anchor: Optional[Tuple[float, float, float, float]] = None,
+        bbox_to_anchor: tuple[float, float, float, float] | None = None,
     ) -> None:
         self.plots = plots
         self.xlim = xlim
@@ -115,8 +115,8 @@ class GenericPlotter(BasePlotter):
     def __init__(self) -> None:
         super().__init__()
 
-        self._plots: List[GenericPlot] = []
-        self._insets: List[InsetPlot] = []
+        self._plots: list[GenericPlot] = []
+        self._insets: list[InsetPlot] = []
 
     def add_generic_plot(self, plotmethod: str, *args: Any, **kwargs: Any) -> None:
         self._plots.append(GenericPlot(plotmethod, *args, **kwargs))
@@ -126,9 +126,9 @@ class GenericPlotter(BasePlotter):
 
     def add_inset(
         self,
-        xlim: Tuple[float, float],
-        ylim: Optional[Tuple[float, float]] = None,
-        plots: Optional[List[Any]] = None,
+        xlim: tuple[float, float],
+        ylim: tuple[float, float] | None = None,
+        plots: list[Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """

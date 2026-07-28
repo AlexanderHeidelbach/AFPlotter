@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict
 
 
 @dataclass(frozen=True)
@@ -16,8 +15,8 @@ class Experiment:
 
     name: str
     mplstyle: Path
-    colors: Dict[str, str]
-    labels: Dict[str, str]
+    colors: dict[str, str]
+    labels: dict[str, str]
 
     def apply_style(self) -> None:
         """Apply this experiment's matplotlib style globally."""

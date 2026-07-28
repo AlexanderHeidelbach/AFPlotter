@@ -3,7 +3,7 @@
 For composed/analysis plots (multiple overlays, fills, insets, fit curves),
 use GenericPlotter/HistogramPlotter directly instead — see docs/.
 """
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +20,7 @@ from afplotter.selectionparser.polars import SelectionOperator
 from afplotter.utilities.histogram import Histogram, HistogramEntry
 from afplotter.utilities.lazyhistogram import LazyHistEntry, LazyHistWrapper
 
-BinsSpec = Union[np.ndarray, List[float], Tuple[float, float, int]]
+BinsSpec = np.ndarray | list[float] | tuple[float, float, int]
 
 
 def _resolve_bins(bins: BinsSpec) -> np.ndarray:
@@ -30,11 +30,11 @@ def _resolve_bins(bins: BinsSpec) -> np.ndarray:
 
 
 def plot_histogram(
-    entries: Dict[str, np.ndarray],
+    entries: dict[str, np.ndarray],
     bins: BinsSpec,
     xlabel: str = "",
     stacked: bool = False,
-    save: Optional[PathType] = None,
+    save: PathType | None = None,
     **histogram_plotter_kwargs: Any,
 ) -> plt.Axes:
     """
@@ -68,13 +68,13 @@ def plot_histogram(
 
 
 def plot_histogram_from_files(
-    files: Dict[str, Union[PathType, List[PathType]]],
+    files: dict[str, PathType | list[PathType]],
     column: str,
     bins: BinsSpec,
     xlabel: str = "",
     stacked: bool = False,
-    selection: Optional[str] = None,
-    save: Optional[PathType] = None,
+    selection: str | None = None,
+    save: PathType | None = None,
     **histogram_plotter_kwargs: Any,
 ) -> plt.Axes:
     """
@@ -124,7 +124,7 @@ def plot_2d_histogram(
     ybins: BinsSpec,
     xlabel: str = "",
     ylabel: str = "",
-    save: Optional[PathType] = None,
+    save: PathType | None = None,
     **histogram2d_plotter_kwargs: Any,
 ) -> plt.Axes:
     """

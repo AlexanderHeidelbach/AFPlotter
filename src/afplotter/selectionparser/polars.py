@@ -3,12 +3,12 @@ from functools import reduce
 import json
 import operator
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import polars as pl
 from afplotter.baseplotter import PathType
 
-def read_json(filename: PathType) -> Dict[str, Any]:
+def read_json(filename: PathType) -> dict[str, Any]:
     with open(filename, "r") as f:
         return json.load(f)
 
@@ -94,8 +94,8 @@ class SelectionOperator:
     def __init__(
         self,
         lazyframe: pl.LazyFrame,
-        selections_path: Optional[Union[str, Path]] = None,
-        selections: Optional[Dict[str, str]] = None,
+        selections_path: str | Path | None = None,
+        selections: dict[str, str] | None = None,
     ) -> None:
         self.lazyframe = lazyframe
         if selections_path is not None:
@@ -107,7 +107,7 @@ class SelectionOperator:
                 "Either selections_path or selections must be provided."
             )
 
-    def _load_query_string(self, selections_path: Union[str, Path]) -> Dict[str, str]:
+    def _load_query_string(self, selections_path: str | Path) -> dict[str, str]:
         """
         Loads the query string dict from a JSON file at the given path.
         """

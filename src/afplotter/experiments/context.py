@@ -1,14 +1,13 @@
 import warnings
-from typing import Optional
 
 from afplotter.experiments.experiment import Experiment
 from afplotter.experiments.registry import get as _get_experiment
 
-_CURRENT_EXPERIMENT: Optional[Experiment] = None
+_CURRENT_EXPERIMENT: Experiment | None = None
 _WARNED_DEFAULT = False
 
 
-def set_experiment(name: Optional[str] = None) -> Experiment:
+def set_experiment(name: str | None = None) -> Experiment:
     """
     Select and apply an experiment's plotting style.
 

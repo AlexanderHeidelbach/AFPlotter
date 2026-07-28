@@ -2,7 +2,7 @@ import hashlib
 from collections import defaultdict
 from copy import deepcopy
 from enum import Enum
-from typing import Any, List, Optional, Tuple, Union, Dict
+from typing import Any
 from pathlib import Path
 
 import polars as pl
@@ -16,10 +16,8 @@ class LazyHistEntry(HistogramEntry):
     def __init__(
         self,
         name: str,
-        input: Union[
-            pl.LazyFrame, Path, str, List[pl.LazyFrame], List[Path], List[str]
-        ],
-        prefilter: Optional[str] = None,  # Assume prefilter is a query string
+        input: pl.LazyFrame | Path | str | list[pl.LazyFrame] | list[Path] | list[str],
+        prefilter: str | None = None,  # Assume prefilter is a query string
         *args,
         **kwargs,
     ) -> None:
@@ -98,12 +96,12 @@ class LazyState:
 
 class LazyHistWrapper:
     def __init__(self) -> None:
-        self.entries: Dict[str, LazyHistEntry] = {}
-        self.hist_configs: Dict[str, Dict[str, Any]] = {}
+        self.entries: dict[str, LazyHistEntry] = {}
+        self.hist_configs: dict[str, dict[str, Any]] = {}
         self.state: LazyState = LazyState()
-        self.histograms: Dict[str, Histogram] = defaultdict(lambda: Histogram())
+        self.histograms: dict[str, Histogram] = defaultdict(lambda: Histogram())
 
-        self.histograms2D: Dict[str, Dict[str, Histogram]] = defaultdict(
+        self.histograms2D: dict[str, dict[str, Histogram]] = defaultdict(
             lambda: {
                 "x": Histogram(),
                 "y": Histogram(),
@@ -114,8 +112,8 @@ class LazyHistWrapper:
     def get_uid(
         column: str,
         bins: np.ndarray,
-        filters: Optional[str] = None,
-        entries_to_hist: Optional[Union[List[str], str]] = None,
+        filters: str | None = None,
+        entries_to_hist: list[str] | str | None = None,
     ) -> str:
         """
         Generate a unique identifier for a histogram configuration
@@ -127,11 +125,7 @@ class LazyHistWrapper:
 
     @staticmethod
     def get_bins(
-        bins: Union[
-            np.ndarray,
-            List[float],
-            List[Union[Tuple[str, str, Any], List[Tuple[str, str, Any]]]],
-        ],
+        bins: np.ndarray | list[float] | list[tuple[str, str, Any] | list[tuple[str, str, Any]]],
     ) -> np.ndarray:
         array_bins = np.array([])
         if isinstance(bins, tuple):
@@ -150,7 +144,7 @@ class LazyHistWrapper:
         return array_bins
 
     def add_lazy_entry(
-        self, entries: Union[LazyHistEntry, List[LazyHistEntry]]
+        self, entries: LazyHistEntry | list[LazyHistEntry]
     ) -> None:
         if not self.state.is_preparation:
             raise Exception("Can only add lazy entries before querying histograms")
@@ -162,12 +156,12 @@ class LazyHistWrapper:
     def add_hist(
         self,
         column: str,
-        bins: Union[np.ndarray, List, Tuple],
+        bins: np.ndarray | list | tuple,
         identifier: str = "",
-        filters: Optional[str] = None,
-        entries_to_hist: Optional[List[str]] = None,
+        filters: str | None = None,
+        entries_to_hist: list[str] | None = None,
         weight: bool = True,
-        factor: Optional[float] = 1.0,
+        factor: float | None = 1.0,
     ) -> None:
         if not self.state.is_production:
             raise Exception(
@@ -203,19 +197,13 @@ class LazyHistWrapper:
         self,
         xcolumn: str,  # Column name for the x-axis of the 2D histogram
         ycolumn: str,  # Column name for the y-axis of the 2D histogram
-        xbins: Union[
-            np.ndarray, List[float], Tuple[float, float, int]
-        ],  # Binning for the x-axis
-        ybins: Union[
-            np.ndarray, List[float], Tuple[float, float, int]
-        ],  # Binning for the y-axis
-        entries_to_hist: Union[
-            str, List[str]
-        ],  # Single or multiple entries to consider for the histogram
+        xbins: np.ndarray | list[float] | tuple[float, float, int],  # Binning for the x-axis
+        ybins: np.ndarray | list[float] | tuple[float, float, int],  # Binning for the y-axis
+        entries_to_hist: str | list[str],  # Single or multiple entries to consider for the histogram
         identifier: str = "",
-        filters: Optional[str] = None,
-        xfactor: Optional[float] = 1.0,
-        yfactor: Optional[float] = 1.0,
+        filters: str | None = None,
+        xfactor: float | None = 1.0,
+        yfactor: float | None = 1.0,
     ):
         if not self.state.is_production:
             raise Exception(
@@ -277,8 +265,8 @@ class LazyHistWrapper:
                 continue
 
             lf = entry.data
-            lf_list: List[pl.LazyFrame] = []
-            uid_list: List[str] = []
+            lf_list: list[pl.LazyFrame] = []
+            uid_list: list[str] = []
 
             for hist in relevant_hists:
                 filtered_lf = lf
@@ -365,7 +353,7 @@ class LazyHistWrapper:
         else:
             return self.histograms[identifier]
 
-    def get_2Dhist(self, identifier: str) -> Dict[str, Histogram]:
+    def get_2Dhist(self, identifier: str) -> dict[str, Histogram]:
         if not self.state.is_state(WrapperState.EXECUTED):
             raise Exception(
                 f"Can only get histograms after execution, but found state: {self.state.name}"
@@ -375,14 +363,14 @@ class LazyHistWrapper:
         else:
             return self.histograms2D[identifier]
 
-    def get_all_hists(self) -> Dict[str, Histogram]:
+    def get_all_hists(self) -> dict[str, Histogram]:
         if not self.state.is_state(WrapperState.EXECUTED):
             raise Exception(
                 f"Can only get histograms after execution, but found state: {self.state.name}"
             )
         return self.histograms
 
-    def get_all_2Dhists(self) -> Dict[str, Dict[str, Histogram]]:
+    def get_all_2Dhists(self) -> dict[str, dict[str, Histogram]]:
         if not self.state.is_state(WrapperState.EXECUTED):
             raise Exception(
                 f"Can only get histograms after execution, but found state: {self.state.name}"
