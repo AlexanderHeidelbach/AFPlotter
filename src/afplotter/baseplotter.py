@@ -6,94 +6,9 @@ from cycler import cycler
 import matplotlib.pyplot as plt
 
 from afplotter.experiments.context import get_experiment
+from afplotter.palettes import get_palette
 
 PathType = str | os.PathLike
-
-
-class KITColors:
-    """
-    KIT color scheme plus additional grey shades
-    """
-
-    kit_green = "#009682"  # type: str
-    kit_blue = "#4664aa"  # type: str
-    kit_maygreen = "#8cb63c"  # type: str
-    kit_yellow = "#fce500"  # type: str
-    kit_orange = "#df9b1b"  # type: str
-    kit_brown = "#a7822e"  # type: str
-    kit_red = "#a22223"  # type: str
-    kit_purple = "#a3107c"  # type: str
-    kit_cyan = "#23a1e0"  # type: str
-    kit_black = "#000000"  # type: str
-    white = "#ffffff"  # type: str
-    light_grey = "#bdbdbd"  # type: str
-    grey = "#797979"  # type: str
-    dark_grey = "#4e4e4e"  # type: str
-
-    lmu_green = "#00883A"  # R 0,   G 136, B 58
-    lmu_blue = "#0F1987"  # R 15,  G 25,  B 135
-    lmu_cyan = "#643BE3"  # R 100, G 59,  B 227
-    lmu_violet = "#8C4091"  # R 140, G 64,  B 145
-    lmu_red = "#D71919"  # R 215, G 25,  B 25
-    lmu_orange = "#F18700"  # R 241, G 135, B 0
-
-    default_colors = [
-        kit_green,
-        kit_blue,
-        kit_red,
-        kit_cyan,
-        kit_orange,
-        kit_maygreen,
-        kit_yellow,
-        kit_purple,
-        kit_brown,
-        dark_grey,
-    ]  # type: list[str]
-
-
-class PetroffColors:
-    """
-    Petroff 10 colour sequence, as shipped in matplotlib's ``petroff10`` style.
-
-    See M. A. Petroff, "Accessible Color Sequences for Data Visualization",
-    arXiv:2107.02270.
-
-    ``red`` is deliberately held out of :attr:`default_colors` and re-exported as
-    :attr:`signal_red` / the module-level ``SIGNAL_COLOR``, so that no background
-    component can ever collide with the colour reserved for signal.
-    """
-
-    blue = "#3f90da"  # type: str
-    amber = "#ffa90e"  # type: str
-    red = "#bd1f01"  # type: str
-    grey_green = "#94a4a2"  # type: str
-    purple = "#832db6"  # type: str
-    brown = "#a96b59"  # type: str
-    orange = "#e76300"  # type: str
-    khaki = "#b9ac70"  # type: str
-    slate = "#717581"  # type: str
-    pale_cyan = "#92dadd"  # type: str
-
-    signal_red = red  # type: str
-
-    default_colors = [
-        blue,
-        amber,
-        grey_green,
-        purple,
-        brown,
-        orange,
-        khaki,
-        slate,
-        pale_cyan,
-    ]  # type: list[str]
-
-
-#: Colour used for signal components. Never appears in the default cycle.
-SIGNAL_COLOR = PetroffColors.signal_red
-
-kit_color_cycler = cycler("color", KITColors.default_colors)
-petroff_color_cycler = cycler("color", PetroffColors.default_colors)
 
 
 def set_matplotlibrc_params(text_size: int = 36) -> None:
@@ -138,7 +53,7 @@ def set_matplotlibrc_params(text_size: int = 36) -> None:
 
     axes = {
         "labelsize": latex_text_size,
-        "prop_cycle": petroff_color_cycler,
+        "prop_cycle": cycler("color", get_palette().background),
         "formatter.limits": (-4, 4),
         "formatter.use_mathtext": True,
         "titlesize": latex_text_size,

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from matplotlib.colors import to_hex
 
-from afplotter.baseplotter import SIGNAL_COLOR, PetroffColors
+from afplotter.palettes import PETROFF_PALETTE, PetroffColors, get_palette
 from afplotter.histogramplot import (
     Histogram2DPlot,
     Histogram2DPlotter,
@@ -163,19 +163,19 @@ def _rendered_colors(hist: Histogram, sig_extra: bool = False) -> dict[str, tupl
 
 def test_stacked_entries_use_the_petroff_cycle():
     colors = _rendered_colors(_uncolored_histogram(n_entries=3))
-    assert [colors[f"B{i}"][0] for i in range(3)] == PetroffColors.default_colors[:3]
+    assert [colors[f"B{i}"][0] for i in range(3)] == PETROFF_PALETTE.background[:3]
 
 
 def test_no_stacked_entry_is_ever_signal_red():
     # 12 entries wraps past the end of the 9-colour cycle; red must still never appear.
     colors = _rendered_colors(_uncolored_histogram(n_entries=12))
-    assert SIGNAL_COLOR not in [face for face, _ in colors.values()]
+    assert get_palette().signal not in [face for face, _ in colors.values()]
 
 
 def test_single_signal_is_drawn_in_signal_red():
     colors = _rendered_colors(_uncolored_histogram(n_entries=2, n_signals=1), sig_extra=True)
-    assert colors["S0"][1] == SIGNAL_COLOR
-    assert [colors[f"B{i}"][0] for i in range(2)] == PetroffColors.default_colors[:2]
+    assert colors["S0"][1] == get_palette().signal
+    assert [colors[f"B{i}"][0] for i in range(2)] == PETROFF_PALETTE.background[:2]
 
 
 def test_single_signal_red_overrides_an_explicit_entry_color():
@@ -190,14 +190,14 @@ def test_single_signal_red_overrides_an_explicit_entry_color():
         )
     )
     colors = _rendered_colors(hist, sig_extra=True)
-    assert colors["S0"][1] == SIGNAL_COLOR
+    assert colors["S0"][1] == get_palette().signal
 
 
 def test_multiple_signals_fall_back_to_the_cycle():
     colors = _rendered_colors(_uncolored_histogram(n_entries=2, n_signals=2), sig_extra=True)
     signal_edges = [colors["S0"][1], colors["S1"][1]]
-    assert signal_edges == PetroffColors.default_colors[:2]
-    assert SIGNAL_COLOR not in signal_edges
+    assert signal_edges == PETROFF_PALETTE.background[:2]
+    assert get_palette().signal not in signal_edges
 
 
 def test_histogram_2d_plotter_end_to_end(synthetic_histogram):

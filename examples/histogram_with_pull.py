@@ -2,7 +2,7 @@
 """
 Mirrors a real fit-result plot: a stacked histogram with signal/background
 model curves and a pull panel, styled with BelleII settings and the default
-Petroff color cycle (signal in the reserved SIGNAL_COLOR red).
+Petroff color cycle (signal in the reserved Petroff palette signal red).
 
 Run: python examples/histogram_with_pull.py
 """
@@ -17,7 +17,7 @@ from afplotter import (
     HistogramPlot,
     HistogramPlotter,
     HistogramVariable,
-    SIGNAL_COLOR,
+    PETROFF_PALETTE,
     PetroffColors,
     set_experiment,
 )
@@ -36,7 +36,7 @@ def main() -> None:
     hist.binning = np.linspace(x_min, x_max, 41)
     # Colors are all-or-nothing per stack: set every entry or none of them (in
     # which case the Petroff cycle supplies them in order).
-    hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=SIGNAL_COLOR))
+    hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=PETROFF_PALETTE.signal))
     hist.add_entry(
         HistogramEntry(name="background", latex_name="Background", array=data["background"], color=PetroffColors.blue)
     )

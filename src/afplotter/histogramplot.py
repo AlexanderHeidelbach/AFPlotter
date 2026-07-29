@@ -5,7 +5,8 @@ from matplotlib.colors import to_hex  # type: ignore
 import numpy as np  # type: ignore
 import seaborn as sns  # type: ignore
 
-from afplotter.baseplotter import SIGNAL_COLOR, BasePlotter
+from afplotter.baseplotter import BasePlotter
+from afplotter.palettes import get_palette
 from afplotter.genericplot import GenericPlot, InsetPlot
 from afplotter.utilities.histogram import Histogram
 
@@ -265,7 +266,7 @@ class HistogramPlot:
             else:
                 # A lone signal component is always drawn in the reserved signal
                 # colour, overriding any explicitly set HistogramEntry.color.
-                colors = [SIGNAL_COLOR]
+                colors = [get_palette().signal]
             hatches = [None] * len(self.histogram.signal)
 
         if labels is None:
