@@ -3,7 +3,6 @@ import numpy as np
 import pytest
 from matplotlib.colors import to_hex
 
-from afplotter.palettes import PETROFF_PALETTE, PetroffColors, get_palette
 from afplotter.histogramplot import (
     Histogram2DPlot,
     Histogram2DPlotter,
@@ -13,6 +12,7 @@ from afplotter.histogramplot import (
     poisson_ratio,
     weighted_mean_and_error,
 )
+from afplotter.palettes import PETROFF_PALETTE, get_palette
 from afplotter.utilities.histogram import Histogram, HistogramEntry
 
 
