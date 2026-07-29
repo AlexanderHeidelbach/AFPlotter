@@ -144,7 +144,10 @@ class Histogram:
             if isinstance(self.binning, int):
                 self.binning = edges
 
-        entry.compute_errors(binning=self.binning)
+        binning = self.binning
+        if isinstance(binning, int):
+            raise ValueError("Binning was not resolved to an array before computing entry errors")
+        entry.compute_errors(binning=binning)
 
         if clear:
             entry.clear_array()
