@@ -28,7 +28,8 @@ Three layers. Pick the lowest one that does the job.
 
 ```
 src/afplotter/
-  baseplotter.py       BasePlotter (styling, legend, watermark, axis limits), KITColors
+  baseplotter.py       BasePlotter (styling, legend, watermark, axis limits)
+  palettes.py          KITColors/LMUColors/PetroffColors, Palette, palette registry + context (set_palette/get_palette)
   genericplot.py       GenericPlot, InsetPlot, GenericPlotter
   histogramplot.py     HistogramPlot, Histogram2DPlot, HistogramPlotter, Histogram2DPlotter
   convenience.py       high-level one-call functions
@@ -53,6 +54,8 @@ limits) chain `add_generic_plot(...)` / `add_generic_text(...)` / `add_inset(...
 | Selections take an explicit path | Was `$ALPS_PATH/configs/selections/<name>`; now `SelectionOperator(lf, selections_path=...)` or an inline dict. Same env-var-independence goal as the style fix. |
 | Skill over MCP server | Ships as `.claude/skills/afplotter/SKILL.md` in-repo — no server process to run or configure, and it activates automatically for anyone who clones the repo and uses Claude Code. |
 | Install from git, not PyPI | Personal/lab tool; `pip install git+https://github.com/AlexanderHeidelbach/AFPlotter.git`. |
+| Petroff 10 as the default cycle, with its red held out | There used to be four uncoordinated palettes: `KITColors` (installed as `axes.prop_cycle`), the ggplot cycler in `belle2_modern.mplstyle` (dead — clobbered by `set_matplotlibrc_params`), seaborn cubehelix (`b2helix`, stacked plots only), and `Experiment.colors` (dead). A stacked and a step plot of the same data looked nothing alike. Now one cycle (`PETROFF_PALETTE.background`, 9 colours) feeds both paths, and `PETROFF_PALETTE.signal = "#bd1f01"` is excluded from it so red always means signal. `KITColors` stays exported, just not default. |
+| Palettes are switchable (`set_palette`) | `KITColors` and `LMUColors` are separate classes now (previously mixed in one). `afplotter.palettes.Palette` pairs a background cycle with its own reserved signal color; `set_palette("KIT"\|"LMU"\|"Petroff")` mirrors `set_experiment(...)`. Default stays Petroff. Register a custom palette via `afplotter.palettes.register_palette(...)`. |
 
 ## Conventions
 
@@ -102,13 +105,14 @@ and write a PNG to `examples/output/` (gitignored).
 ## Status
 
 Standalone-packaging work is complete on `feature/standalone-package-and-skill`: the import-time
-crash is fixed, all previously-empty test files have real coverage (93 tests), and README/docs/
+crash is fixed, all previously-empty test files have real coverage (116 tests), and README/docs/
 examples/skill are in place.
 
 Open follow-ups:
 
 - `Experiment.colors` and `labels["status"]` are defined but never read (only `labels["experiment"]`
-  is wired, into the watermark name text). `KITColors` is still the only source of plotting colors.
+  is wired, into the watermark name text). Their values now at least agree with `PetroffColors`,
+  but nothing consumes them — signal red is deliberately experiment-independent.
 - Only `BelleII` (real, Alex's own style) and `Generic` (neutral matplotlib-defaults fallback) ship
   built in. Register your own via `afplotter.experiments.registry.register(...)` rather than adding
   more built-ins for experiments this repo's maintainer isn't part of.

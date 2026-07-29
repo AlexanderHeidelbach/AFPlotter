@@ -53,9 +53,14 @@ Key building blocks:
   — defaults to replaying the same content as the main plot; see
   `docs/composed-plots.md` for `width`/`height`/`loc`/`bbox_to_anchor`/
   `mark_region` details.
-- `KITColors` (imported from `afplotter`) for the standard color palette
-  (`kit_green`, `kit_blue`, `kit_orange`, `kit_red`, `kit_purple`, etc., plus
-  an `lmu_*` set).
+- Colors: the default cycle is Petroff 10 minus its red — `PETROFF_PALETTE`
+  (imported from `afplotter.palettes`). Leave `color=` unset on `HistogramEntry`
+  and the cycle supplies it; entries that do set one keep it. The held-out red
+  is `get_palette().signal`, used automatically for entries with `type="signal"`;
+  never hand that red to a background component. Switch the whole cycle with
+  `set_palette("KIT" | "LMU" | "Petroff")`. `KITColors` (`kit_green`, `kit_blue`,
+  `kit_red`, …) and `LMUColors` (`lmu_green`, `lmu_blue`, …) are still exported
+  separately for explicit one-off colors.
 
 ## Step 3: Save and report
 

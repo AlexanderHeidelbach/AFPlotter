@@ -3,13 +3,17 @@
 # Generic Style
 #
 # A neutral fallback: matplotlib's own defaults, plus a few generally useful
-# readability tweaks (no experiment-specific colors, fonts, or tick sizing).
+# readability tweaks and the library-wide Petroff color cycle (no
+# experiment-specific fonts or tick sizing).
 # Bundle your own .mplstyle and register it via afplotter.experiments.registry
 # for anything more specific.
 
 figure.facecolor: white
 axes.facecolor: white
 axes.grid: False
+
+# Color cycle is supplied at runtime by afplotter.set_palette(...) (default: Petroff),
+# applied by BasePlotter via set_matplotlibrc_params() after this style loads.
 
 legend.frameon: False
 

@@ -7,7 +7,7 @@ register(
     Experiment(
         name="BelleII",
         mplstyle=Path(__file__).parent / "belle2_modern.mplstyle",
-        colors={"signal": "#E41A1C", "background": "#377EB8"},
+        colors={"signal": "#bd1f01", "background": "#3f90da"},
         labels={"experiment": "Belle II", "status": "Simulation (Own Work)"},
     )
 )

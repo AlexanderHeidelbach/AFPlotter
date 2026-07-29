@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 from typing import Any, Callable
 from matplotlib import pyplot as plt  # type: ignore
-from matplotlib.colors import to_hex  # type: ignore
 import numpy as np  # type: ignore
-import seaborn as sns  # type: ignore
 
 from afplotter.baseplotter import BasePlotter
+from afplotter.palettes import get_palette
 from afplotter.genericplot import GenericPlot, InsetPlot
 from afplotter.utilities.histogram import Histogram
 
@@ -185,26 +184,21 @@ class HistogramPlot:
         return [hatches_list[i % len(hatches_list)] for i in range(n)]
 
     @staticmethod
-    def b2helix(n: int) -> list:
-        rgb_colors = sns.cubehelix_palette(
-            n, start=1.5, rot=1.5, dark=0.3, light=0.8, reverse=True
-        )
-        hex_colors = [to_hex(rgb) for rgb in rgb_colors]
-        return hex_colors
-
-    @staticmethod
     def std_colors(n: int) -> list[str]:
         colormap = dict(plt.rcParams)["axes.prop_cycle"].by_key()["color"]
         return [colormap[i % len(colormap)] for i in range(n)]
+
+    @staticmethod
+    def _fill_missing_colors(colors: list[str | None]) -> list[str]:
+        cycle = HistogramPlot.std_colors(len(colors))
+        return [color if color is not None else cycle[i] for i, color in enumerate(colors)]
 
     def _prepare_data(self) -> None:
         assert self.data_hist is not None
 
 
     def plot_stacked(self) -> None:
-        colors = self.histogram.get_colors()
-        if not all((color is not None) for color in colors):
-            colors = self.b2helix(len(self.histogram.entries))
+        colors = self._fill_missing_colors(self.histogram.get_colors())
 
         self.ax.hist(
             self.histogram.get_bin_centers(),
@@ -245,25 +239,19 @@ class HistogramPlot:
             weights = self.histogram.get_bin_counts()
             errors = self.histogram.get_bin_errors()
             labels = self.histogram.get_latex_names()
-            if any(color is None for color in self.histogram.get_colors()):
-                colors = self.std_colors(len(self.histogram.entries))
-                hatches = [None] * len(self.histogram.entries)
-            else:
-                colors = self.histogram.get_colors()
-                hatches = self.histogram.get_hatches()
+            colors = self._fill_missing_colors(self.histogram.get_colors())
+            hatches = self.histogram.get_hatches()
         else:
             centers = [self.histogram.get_bin_centers()[0]] * len(self.histogram.signal)
             weights = self.histogram.get_signal_bin_counts()
             errors = self.histogram.get_signal_bin_errors()
             labels = self.histogram.get_signal_latex_names()
             if len(self.histogram.signal) != 1:
-                if any(color is None for color in self.histogram.get_signal_colors()):
-                    colors = self.std_colors(len(self.histogram.signal))
-                else:
-                    colors = self.histogram.get_signal_colors()
-
+                colors = self._fill_missing_colors(self.histogram.get_signal_colors())
             else:
-                colors = ["red"]
+                # A lone signal component is always drawn in the reserved signal
+                # colour, overriding any explicitly set HistogramEntry.color.
+                colors = [get_palette().signal]
             hatches = [None] * len(self.histogram.signal)
 
         if labels is None:

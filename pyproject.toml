@@ -10,7 +10,6 @@ dependencies = [
     "matplotlib",
     "numpy",
     "polars",
-    "seaborn",
     "cycler",
     "importlib_resources",
 ]

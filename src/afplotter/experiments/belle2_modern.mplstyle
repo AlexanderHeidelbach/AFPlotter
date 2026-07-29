@@ -71,8 +71,8 @@ axes.facecolor: white
 axes.edgecolor: .05
 axes.linewidth: 1.2
 axes.formatter.limits : -7, 7
-axes.prop_cycle: cycler('color', ['348ABD','E24A33', '988ED5', '777777', 'FBC15E', '8EBA42', 'FFB5B8'])
-#axes.prop_cycle: cycler('color', ['fd6769', '6bcdfd', '356535', '971497'])
+# Color cycle is supplied at runtime by afplotter.set_palette(...) (default: Petroff),
+# applied by BasePlotter via set_matplotlibrc_params() after this style loads.
 
 axes.formatter.use_mathtext : True
 axes.formatter.useoffset      : False
