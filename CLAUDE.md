@@ -7,6 +7,30 @@ query-string selection parser. Built-in experiment styles (Belle II / Generic).
 This file orients contributors and AI agents working in this repo. User-facing docs are in
 `README.md` and `docs/`.
 
+## Development workflow (required for AI agents)
+
+This repo is developed AI-first: any non-trivial change (a new feature, a bugfix with more
+than a one-line fix, a refactor, anything touching more than one file for a reason beyond
+a mechanical rename) MUST go through the
+[Superpowers](https://github.com/obra/superpowers) skill pipeline, in order:
+
+1. **`superpowers:brainstorming`** — turn the request into a design, get it approved, write
+   it to `docs/superpowers/specs/`.
+2. **`superpowers:writing-plans`** — turn the approved design into a bite-sized, TDD-structured
+   implementation plan, written to `docs/superpowers/plans/`.
+3. **`superpowers:subagent-driven-development`** — execute the plan with a fresh implementer
+   subagent per task, a task-scoped reviewer after each, and a final whole-branch review
+   before merge.
+
+**Exception**: trivial changes (typo fixes, doc-only corrections, a single-line mechanical
+fix already fully specified by whoever asked for it) can be made directly — don't invoke the
+full pipeline for those. When in doubt, use it; the pipeline overhead on a small task is much
+cheaper than an unreviewed regression.
+
+Concrete precedent: the `palettes.py`/`set_palette` work (PR #10) and the `pr-check` /
+`verify-examples` skills (PR #12) were both built this way — see their commit history and
+`docs/superpowers/{specs,plans}/` for the artifacts this pipeline produces.
+
 ## Setup
 
 ```bash
