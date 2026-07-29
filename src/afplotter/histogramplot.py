@@ -197,11 +197,15 @@ class HistogramPlot:
     def plot_stacked(self) -> None:
         colors = self._fill_missing_colors(self.histogram.get_colors())
 
+        # Signal components are appended last, so they always end up as the topmost
+        # layer of the stack, drawn at their true yield in the reserved signal colour.
+        colors = list(colors) + [get_palette().signal] * len(self.histogram.signal)
+
         self.ax.hist(
-            self.histogram.get_bin_centers(),
+            self.histogram.get_stacked_bin_centers(),
             bins=self.histogram.binning,  # type: ignore
-            weights=self.histogram.get_bin_counts(),
-            label=self.histogram.get_latex_names(),  # type: ignore
+            weights=self.histogram.get_stacked_bin_counts(),
+            label=self.histogram.get_stacked_latex_names(),  # type: ignore
             color=colors,  # type: ignore
             histtype="stepfilled",
             stacked=True,

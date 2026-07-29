@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from matplotlib.colors import to_hex
+from matplotlib.patches import Polygon
 
 from afplotter.histogramplot import (
     Histogram2DPlot,
@@ -140,6 +141,40 @@ def _uncolored_histogram(n_entries: int = 3, n_signals: int = 0) -> Histogram:
     return hist
 
 
+def _render_stacked(hist: Histogram, sig_extra: bool = False, uncertainty: bool = False) -> plt.Axes:
+    """Render ``hist`` as a stacked plot and return the main axes."""
+    histplot = HistogramPlot(hist)
+    histplot.stacked = True
+    histplot.sig_extra = sig_extra
+    histplot.uncertainty = uncertainty
+    plotter = HistogramPlotter(histplot, HistogramVariable("$M$", "GeV"))
+    ax, _ = plotter.plot(save=False)
+    return ax
+
+
+def _stack_layers(ax: plt.Axes) -> dict[str, tuple[str, float]]:
+    """Map each *filled* stack layer's label to its (facecolor, top y).
+
+    ``stepfilled`` stack layers are filled Polygons; the ``sig_extra`` outline overlay
+    and the uncertainty band are not, so filtering on ``get_fill()`` separates them.
+    A layer's top y is the cumulative stack height, which is how "on top" is checked.
+    """
+    return {
+        p.get_label(): (to_hex(p.get_facecolor()), float(np.max(p.get_xy()[:, 1])))
+        for p in ax.patches
+        if isinstance(p, Polygon) and p.get_fill()
+    }
+
+
+def _overlay_outlines(ax: plt.Axes) -> dict[str, tuple[str, float]]:
+    """Map each *unfilled* ``sig_extra`` outline's label to its (edgecolor, top y)."""
+    return {
+        p.get_label(): (to_hex(p.get_edgecolor()), float(np.max(p.get_xy()[:, 1])))
+        for p in ax.patches
+        if isinstance(p, Polygon) and not p.get_fill()
+    }
+
+
 def _rendered_colors(hist: Histogram, sig_extra: bool = False) -> dict[str, tuple[str, str]]:
     """Render ``hist`` and map each artist's label to its (facecolor, edgecolor) hex.
 
@@ -234,6 +269,119 @@ def test_step_backfills_only_missing_entry_colors_and_keeps_hatches():
     result = _rendered_step_colors_and_hatches(hist)
     assert result["B0"] == ("#00ff00", "///")
     assert result["B1"][0] == PETROFF_PALETTE.background[1]
+
+
+def test_signal_is_the_topmost_stack_layer():
+    hist = _uncolored_histogram(n_entries=3, n_signals=1)
+    ax = _render_stacked(hist)
+    layers = _stack_layers(ax)
+    signal_top = layers["S0"][1]
+    # The signal layer closes the stack, so its top is the full S+B total and every
+    # background layer sits strictly below it.
+    assert signal_top == pytest.approx(float(np.max(hist.get_total_bin_count())))
+    assert all(layers[f"B{i}"][1] < signal_top for i in range(3))
+    plt.close(ax.figure)
+
+
+def test_stacked_signal_is_filled_red_at_its_true_yield():
+    hist = _uncolored_histogram(n_entries=2, n_signals=1)
+    ax = _render_stacked(hist)
+    layers = _stack_layers(ax)
+    assert layers["S0"][0] == get_palette().signal
+    # Stacked at the true yield, not peak-matched to the background stack the way the
+    # sig_extra overlay is: the stack top must exceed the background-only maximum by
+    # the signal's own counts, not by a scale factor.
+    background_max = float(np.max(np.sum(hist.get_bin_counts(), axis=0)))
+    assert layers["S0"][1] > background_max
+    assert layers["S0"][1] == pytest.approx(float(np.max(hist.get_total_bin_count())))
+    plt.close(ax.figure)
+
+
+def test_stacked_signal_red_overrides_an_explicit_entry_color():
+    hist = _uncolored_histogram(n_entries=2)
+    hist.add_entry(
+        HistogramEntry(
+            name="sig0",
+            latex_name="S0",
+            array=np.random.default_rng(8).normal(5, 1, 300),
+            type="signal",
+            color="#00ff00",
+        )
+    )
+    ax = _render_stacked(hist)
+    assert _stack_layers(ax)["S0"][0] == get_palette().signal
+    plt.close(ax.figure)
+
+
+def test_uncertainty_band_covers_the_signal_layer_too():
+    hist = _uncolored_histogram(n_entries=2, n_signals=1)
+    ax = _render_stacked(hist, uncertainty=True)
+    band = next(c for c in ax.containers if c.get_label() == "Stat. unc.")
+    band_tops = np.array([bar.get_y() + bar.get_height() for bar in band.patches])
+
+    # Build the expectation from the raw components rather than from the total
+    # accessors under test, so a regression that drops signal from the totals shows up.
+    background = np.sum(hist.get_bin_counts(), axis=0)
+    signal = np.sum(hist.get_raw_signal_bin_counts(), axis=0)
+    errors = np.sqrt(
+        np.sum([e**2 for e in hist.get_bin_errors() + hist.get_raw_signal_bin_errors()], axis=0)
+    )
+    assert band_tops == pytest.approx(background + signal + errors)
+    plt.close(ax.figure)
+
+
+def test_sig_extra_still_draws_the_rescaled_outline_on_top_of_the_stack():
+    hist = _uncolored_histogram(n_entries=2, n_signals=1)
+    ax = _render_stacked(hist, sig_extra=True)
+    # The signal now appears twice: once as a filled stack layer at its true yield,
+    # once as the unfilled peak-matched outline.
+    assert _stack_layers(ax)["S0"][0] == get_palette().signal
+    outline_color, outline_top = _overlay_outlines(ax)["S0"]
+    assert outline_color == get_palette().signal
+    # The outline is still peak-matched to the background stack, so it is taller than
+    # the raw signal but shorter than the full S+B stack.
+    background_max = float(np.max(np.sum(hist.get_bin_counts(), axis=0)))
+    assert outline_top == pytest.approx(background_max)
+    plt.close(ax.figure)
+
+
+def _pull_values(plotter: HistogramPlotter) -> np.ndarray:
+    """The y values of the pull errorbar queued by add_pull()."""
+    errorbar = next(p for p in plotter.pull_plots if p.plotmethod == "errorbar")
+    return np.asarray(errorbar.args[1])
+
+
+def test_pull_panel_compares_against_signal_plus_background():
+    hist = _uncolored_histogram(n_entries=2, n_signals=1)
+    centers = hist.get_bin_centers()[0]
+    total = hist.get_total_bin_count()
+    background = np.sum(hist.get_bin_counts(), axis=0)
+    assert not np.allclose(total, background), "fixture must have a non-zero signal"
+
+    histplot = HistogramPlot(hist)
+    histplot.stacked = True
+    plotter = HistogramPlotter(histplot, HistogramVariable("$M$", "GeV"))
+    plotter.add_pull(lambda x: np.interp(x, centers, total), label="S+B")
+    # A model equal to the full S+B stack is a perfect fit, so every pull is zero.
+    assert _pull_values(plotter) == pytest.approx(np.zeros_like(total))
+
+    plotter_bkg = HistogramPlotter(HistogramPlot(hist), HistogramVariable("$M$", "GeV"))
+    plotter_bkg.add_pull(lambda x: np.interp(x, centers, background), label="B only")
+    # A background-only model now misses the signal, so pulls must be non-zero.
+    assert np.any(np.abs(_pull_values(plotter_bkg)) > 1e-6)
+
+
+def test_multiple_signal_outlines_fall_back_to_the_cycle():
+    # The stack forces every signal layer red; only the sig_extra outlines fall back
+    # to the ordinary cycle when there is more than one signal.
+    ax = _render_stacked(_uncolored_histogram(n_entries=2, n_signals=2), sig_extra=True)
+    layers = _stack_layers(ax)
+    assert [layers["S0"][0], layers["S1"][0]] == [get_palette().signal, get_palette().signal]
+    outlines = _overlay_outlines(ax)
+    outline_colors = [outlines["S0"][0], outlines["S1"][0]]
+    assert outline_colors == PETROFF_PALETTE.background[:2]
+    assert get_palette().signal not in outline_colors
+    plt.close(ax.figure)
 
 
 def test_histogram_2d_plotter_end_to_end(synthetic_histogram):

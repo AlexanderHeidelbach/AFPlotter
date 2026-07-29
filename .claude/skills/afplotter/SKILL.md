@@ -61,6 +61,13 @@ Key building blocks:
   `set_palette("KIT" | "LMU" | "Petroff")`. `KITColors` (`kit_green`, `kit_blue`,
   `kit_red`, …) and `LMUColors` (`lmu_green`, `lmu_blue`, …) are still exported
   separately for explicit one-off colors.
+- Signal: mark it with `type="signal"` on the `HistogramEntry`. With
+  `HistogramPlot.stacked = True` it is drawn last, so it always sits on top of
+  the stack in `get_palette().signal` at its true yield, and it counts toward
+  the totals the `Stat. unc.` band and `add_pull` use. Set
+  `HistogramPlot.sig_extra = True` when the signal is too small to see at true
+  yield — it then draws *only* the peak-matched outline and is excluded from
+  the stack entirely (never both; that would draw and legend it twice).
 
 ## Step 3: Save and report
 

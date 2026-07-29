@@ -2,7 +2,8 @@
 """
 Mirrors a real fit-result plot: a stacked histogram with signal/background
 model curves and a pull panel, styled with BelleII settings and the default
-Petroff color cycle (signal in the reserved Petroff palette signal red).
+Petroff color cycle. The signal is a type="signal" entry, so it closes the
+stack on top in the reserved signal red (``get_palette().signal``).
 
 Run: python examples/histogram_with_pull.py
 """
@@ -17,7 +18,6 @@ from afplotter import (
     HistogramPlot,
     HistogramPlotter,
     HistogramVariable,
-    PETROFF_PALETTE,
     PetroffColors,
     set_experiment,
 )
@@ -34,14 +34,12 @@ def main() -> None:
 
     hist = Histogram()
     hist.binning = np.linspace(x_min, x_max, 41)
-    # Any entry without an explicit color is backfilled from the active cycle;
-    # entries that do set one (like these) keep it.
-    hist.add_entry(
-        HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=PETROFF_PALETTE.signal)
-    )
-    hist.add_entry(
-        HistogramEntry(name="background", latex_name="Background", array=data["background"], color=PetroffColors.blue)
-    )
+    # Background takes its color from the Petroff cycle; the signal is marked with
+    # type="signal", so it closes the stack on top in the reserved signal red
+    # automatically and counts toward the S+B total the pull panel compares the
+    # model against.
+    hist.add_entry(HistogramEntry(name="background", latex_name="Background", array=data["background"]))
+    hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], type="signal"))
 
     histplot = HistogramPlot(hist)
     histplot.stacked = True

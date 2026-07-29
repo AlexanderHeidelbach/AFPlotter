@@ -202,6 +202,13 @@ class Histogram:
         else:
             return list(entry.latex_name if entry.latex_name else entry.name for entry in self.entries.values())
 
+    def get_stacked_latex_names(self) -> list[str] | None:
+        """Legend labels for every stack layer, bottom first — entries, then signal."""
+        names = self.get_latex_names()
+        if names is None:
+            return None
+        return names + self.get_signal_latex_names()
+
     def get_signal_names(self) -> list[str]:
         return list(entry.name for entry in self.signal.values())
 
@@ -225,6 +232,19 @@ class Histogram:
         entries = self.entries if self.entries else self.signal
         return [np.array(bin_mids) for _ in entries]
 
+    def get_stacked_bin_centers(self) -> list[np.ndarray]:
+        """Bin centers repeated once per stack layer (entries, then signal)."""
+        assert not isinstance(self.binning, int)
+        assert self.binning is not None
+
+        bin_mids = np.array(
+            [
+                (self.binning[i] + self.binning[i + 1]) / 2
+                for i in range(0, len(self.binning) - 1)
+            ]
+        )
+        return [bin_mids for _ in range(len(self.entries) + len(self.signal))]
+
     def get_bin_width(self) -> float:
         assert not isinstance(self.binning, int)
         assert self.binning is not None
@@ -237,8 +257,26 @@ class Histogram:
     def get_bin_counts(self) -> list[np.ndarray]:
         return [self.get_bin_count_for_entry(entry) for entry in self.entries.values()]
 
+    def get_raw_signal_bin_counts(self) -> list[np.ndarray]:
+        """Signal counts at their true yield, i.e. what is stacked and summed.
+
+        Contrast :meth:`get_signal_bin_counts`, which peak-matches the signal to the
+        background stack for the ``sig_extra`` outline overlay.
+        """
+        return [self.get_bin_count_for_entry(entry) for entry in self.signal.values()]
+
+    def get_raw_signal_bin_errors(self) -> list[np.ndarray]:
+        """Signal errors at their true yield. See :meth:`get_raw_signal_bin_counts`."""
+        return [self.get_bin_error_for_entry(entry=entry) for entry in self.signal.values()]
+
+    def get_stacked_bin_counts(self) -> list[np.ndarray]:
+        """Bin counts of every stack layer, bottom first — entries, then signal on top."""
+        return self.get_bin_counts() + self.get_raw_signal_bin_counts()
+
     def get_total_bin_count(self) -> np.ndarray:
-        return np.sum(self.get_bin_counts(), axis=0)
+        # The modelled total is signal + background: both entries and signal are
+        # model components, and signal is a layer of the stack.
+        return np.sum(self.get_stacked_bin_counts(), axis=0)
 
     def get_total_scale(self) -> float:
         return float(np.sum(self.get_total_bin_count() * self.get_bin_width()))
@@ -249,13 +287,12 @@ class Histogram:
     def get_bin_errors(self) -> list[np.ndarray]:
         return [self.get_bin_error_for_entry(entry=entry) for entry in self.entries.values()]
 
+    def get_stacked_bin_errors(self) -> list[np.ndarray]:
+        """Bin errors of every stack layer, bottom first — entries, then signal on top."""
+        return self.get_bin_errors() + self.get_raw_signal_bin_errors()
+
     def get_total_bin_errors(self) -> np.ndarray:
-        return np.sqrt(
-            np.sum(
-                [self.get_bin_error_for_entry(entry=entry) ** 2 for entry in self.entries.values()],
-                axis=0,
-            )
-        )
+        return np.sqrt(np.sum([errors**2 for errors in self.get_stacked_bin_errors()], axis=0))
 
     def get_signal_bin_count_for_component(self, entry: HistogramEntry) -> tuple[np.ndarray, float]:
         bin_count = self.get_bin_count_for_entry(entry=entry).astype(float)
