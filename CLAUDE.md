@@ -38,7 +38,9 @@ uv sync --extra dev
 uv run pytest tests/ -v   # full suite
 ```
 
-`pre-commit run --all-files` runs ruff (lint + format) and mypy.
+`pre-commit run --all-files` runs ruff (lint + format) and mypy. CI now runs the same
+three checks (pinned to the same versions as pre-commit) alongside the test suite, so a
+skipped `pre-commit install` no longer lets lint/type regressions through unnoticed.
 
 ## Architecture
 

@@ -18,7 +18,7 @@ readme = "README.md"
 license = {text = "MIT"}
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-cov"]
+dev = ["pytest", "pytest-cov", "ruff==0.5.0", "mypy==1.10.1"]
 
 [tool.ruff]
 line-length = 120

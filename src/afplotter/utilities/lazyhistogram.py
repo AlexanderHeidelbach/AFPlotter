@@ -121,7 +121,7 @@ class LazyHistWrapper:
 
     @staticmethod
     def get_bins(
-        bins: np.ndarray | list[float] | list[tuple[str, str, Any] | list[tuple[str, str, Any]]],
+        bins: np.ndarray | list[float] | tuple[float, float, int],
     ) -> np.ndarray:
         array_bins = np.array([])
         if isinstance(bins, tuple):
