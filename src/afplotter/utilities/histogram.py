@@ -20,8 +20,7 @@ class HistogramEntry:
     def __add__(self, other: "HistogramEntry") -> "HistogramEntry":
         if len(self.counts) != len(other.counts):
             raise ValueError(
-                f"The two HistogramEntries {self.name} and {other.name}"
-                "have different binns. They cannot be added."
+                f"The two HistogramEntries {self.name} and {other.name}" "have different binns. They cannot be added."
             )
         return HistogramEntry(
             counts=self.counts + other.counts,
@@ -37,8 +36,7 @@ class HistogramEntry:
             self.errors = np.sqrt(self.errors**2 + other.errors**2)
         else:
             raise ValueError(
-                f"The two HistogramEntries {self.name} and {other.name}"
-                "have different binns. They cannot be added."
+                f"The two HistogramEntries {self.name} and {other.name}" "have different binns. They cannot be added."
             )
         self.clear_array()
         return self
@@ -70,9 +68,7 @@ class HistogramEntry:
             f"The array for the HistogramEntry {self.name} is not set."
             + "Either this method was called too early or the array was already cleared."
         )
-        self.counts, edges = np.histogram(
-            self.array, bins=binning, weights=self.get_weights()
-        )
+        self.counts, edges = np.histogram(self.array, bins=binning, weights=self.get_weights())
         return edges
 
     def compute_errors(self, binning: np.ndarray) -> None:
@@ -117,18 +113,10 @@ class Histogram:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Histogram":
         instance = cls()
-        instance.binning = (
-            np.array(data["binning"]) if data["binning"] is not None else None
-        )
+        instance.binning = np.array(data["binning"]) if data["binning"] is not None else None
         instance.metadata = data["metadata"]
-        instance.entries = {
-            name: HistogramEntry.from_dict(entry_data)
-            for name, entry_data in data["entries"].items()
-        }
-        instance.signal = {
-            name: HistogramEntry.from_dict(entry_data)
-            for name, entry_data in data["signal"].items()
-        }
+        instance.entries = {name: HistogramEntry.from_dict(entry_data) for name, entry_data in data["entries"].items()}
+        instance.signal = {name: HistogramEntry.from_dict(entry_data) for name, entry_data in data["signal"].items()}
         return instance
 
     @property
@@ -186,9 +174,7 @@ class Histogram:
         hatch: str | None = None,
         type: str = "entry",
     ) -> None:
-        new_entry = HistogramEntry(
-            name=name, latex_name=latex_name, color=color, hatch=hatch, type=type
-        )
+        new_entry = HistogramEntry(name=name, latex_name=latex_name, color=color, hatch=hatch, type=type)
         try:
             for entry_name in entries:
                 new_entry += self.get_entry(entry_name)
@@ -211,19 +197,13 @@ class Histogram:
         if any(not entry.show_label for entry in self.entries.values()):
             return None
         else:
-            return list(
-                entry.latex_name if entry.latex_name else entry.name
-                for entry in self.entries.values()
-            )
+            return list(entry.latex_name if entry.latex_name else entry.name for entry in self.entries.values())
 
     def get_signal_names(self) -> list[str]:
         return list(entry.name for entry in self.signal.values())
 
     def get_signal_latex_names(self) -> list[str]:
-        return list(
-            entry.latex_name if entry.latex_name else entry.name
-            for entry in self.signal.values()
-        )
+        return list(entry.latex_name if entry.latex_name else entry.name for entry in self.signal.values())
 
     def get_colors(self) -> list[str | None]:
         return list(entry.color for entry in self.entries.values())
@@ -238,10 +218,7 @@ class Histogram:
         assert not isinstance(self.binning, int)
         assert self.binning is not None
 
-        bin_mids = [
-            (self.binning[i] + self.binning[i + 1]) / 2
-            for i in range(0, len(self.binning) - 1)
-        ]
+        bin_mids = [(self.binning[i] + self.binning[i + 1]) / 2 for i in range(0, len(self.binning) - 1)]
         entries = self.entries if self.entries else self.signal
         return [np.array(bin_mids) for _ in entries]
 
@@ -267,24 +244,17 @@ class Histogram:
         return entry.errors
 
     def get_bin_errors(self) -> list[np.ndarray]:
-        return [
-            self.get_bin_error_for_entry(entry=entry) for entry in self.entries.values()
-        ]
+        return [self.get_bin_error_for_entry(entry=entry) for entry in self.entries.values()]
 
     def get_total_bin_errors(self) -> np.ndarray:
         return np.sqrt(
             np.sum(
-                [
-                    self.get_bin_error_for_entry(entry=entry) ** 2
-                    for entry in self.entries.values()
-                ],
+                [self.get_bin_error_for_entry(entry=entry) ** 2 for entry in self.entries.values()],
                 axis=0,
             )
         )
 
-    def get_signal_bin_count_for_component(
-        self, entry: HistogramEntry
-    ) -> tuple[np.ndarray, float]:
+    def get_signal_bin_count_for_component(self, entry: HistogramEntry) -> tuple[np.ndarray, float]:
         bin_count = self.get_bin_count_for_entry(entry=entry).astype(float)
         scaling = 1
         if self.entries:
@@ -314,17 +284,12 @@ class Histogram:
         return scaling * self.get_bin_error_for_entry(entry=entry)
 
     def get_signal_bin_errors(self) -> list[np.ndarray]:
-        return [
-            self.get_signal_bin_error_for_entry(entry=entry)
-            for entry in self.signal.values()
-        ]
+        return [self.get_signal_bin_error_for_entry(entry=entry) for entry in self.signal.values()]
 
     def get_scale(self) -> float:
         return np.max([self.get_total_scale(), self.get_total_signal_scale()])
 
     def order_entries(self, entry_name: list[str]) -> None:
         if len(entry_name) != len(self.entries):
-            raise ValueError(
-                "The number of entries to order does not match the number of entries."
-            )
+            raise ValueError("The number of entries to order does not match the number of entries.")
         self.entries = {name: self.entries[name] for name in entry_name}

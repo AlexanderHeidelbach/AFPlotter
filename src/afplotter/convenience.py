@@ -3,7 +3,8 @@
 For composed/analysis plots (multiple overlays, fills, insets, fit curves),
 use GenericPlotter/HistogramPlotter directly instead — see docs/.
 """
-from typing import Any
+
+from typing import Any, TypeAlias
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +21,7 @@ from afplotter.selectionparser.polars import SelectionOperator
 from afplotter.utilities.histogram import Histogram, HistogramEntry
 from afplotter.utilities.lazyhistogram import LazyHistEntry, LazyHistWrapper
 
-BinsSpec = np.ndarray | list[float] | tuple[float, float, int]
+BinsSpec: TypeAlias = np.ndarray | list[float] | tuple[float, float, int]
 
 
 def _resolve_bins(bins: BinsSpec) -> np.ndarray:

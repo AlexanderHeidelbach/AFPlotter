@@ -1,4 +1,3 @@
-
 from afplotter.experiments.experiment import Experiment
 
 EXPERIMENTS: dict[str, Experiment] = {}
@@ -44,6 +43,4 @@ def get(name: str) -> Experiment:
     try:
         return EXPERIMENTS[name]
     except KeyError as exc:
-        raise ValueError(
-            f"Unknown experiment '{name}'. Available: {', '.join(EXPERIMENTS)}"
-        ) from exc
+        raise ValueError(f"Unknown experiment '{name}'. Available: {', '.join(EXPERIMENTS)}") from exc

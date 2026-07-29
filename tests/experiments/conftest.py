@@ -11,9 +11,7 @@ def _reset_experiment_state():
     context._CURRENT_EXPERIMENT = None
     context._WARNED_DEFAULT = False
     for module_name in list(sys.modules.keys()):
-        if "afplotter.experiments" in module_name and any(
-            exp in module_name for exp in ("belle2", "generic")
-        ):
+        if "afplotter.experiments" in module_name and any(exp in module_name for exp in ("belle2", "generic")):
             del sys.modules[module_name]
 
 

@@ -289,11 +289,7 @@ class BasePlotter(ABC):
 
     def _get_savestring(self) -> PathType:
         """Concatinates savedir, savename and saveformat to full savepath"""
-        return (
-            os.path.join(self.savedir, f"{self.savename}.{self.saveformat}")
-            if not self.savepath
-            else self.savepath
-        )
+        return os.path.join(self.savedir, f"{self.savename}.{self.saveformat}") if not self.savepath else self.savepath
 
     def _add_text_to_plot(self, ax: plt.Axes) -> None:
         """Handling of different texts in the plot."""
@@ -387,9 +383,7 @@ class BasePlotter(ABC):
 
             yax.set_ylabel(label)
 
-    def _set_axislimits(
-        self, ax: plt.Axes, ylim: tuple[float, float] | None = None
-    ) -> None:
+    def _set_axislimits(self, ax: plt.Axes, ylim: tuple[float, float] | None = None) -> None:
         """Set axis limits depending on number of legend and text lines"""
         xlim = self.xlim
         ylim = self.ylim if ylim is None else ylim
@@ -401,11 +395,9 @@ class BasePlotter(ABC):
             ax.set_ylim(
                 bottom=ax.get_ylim()[0],
                 top=(
-                    ax.get_ylim()[1]
-                    * (1 + 0.1 * lines_legend * np.sign(ax.get_ylim()[1]))
+                    ax.get_ylim()[1] * (1 + 0.1 * lines_legend * np.sign(ax.get_ylim()[1]))
                     if not self.log
-                    else ax.get_ylim()[1]
-                    * (1 + 10 ** (max([lines_legend, lines_text]) / 2))
+                    else ax.get_ylim()[1] * (1 + 10 ** (max([lines_legend, lines_text]) / 2))
                 ),
             )
         else:
@@ -422,9 +414,5 @@ class BasePlotter(ABC):
             labels.extend(label)
 
         if labels:
-            ncol = len(labels) // self.legend_ncol + (
-                1 if len(labels) % self.legend_ncol != 0 else 0
-            )
-            ax[0].legend(
-                lines, labels, ncol=ncol, title=self.legend_title, loc=self.legend_loc
-            )
+            ncol = len(labels) // self.legend_ncol + (1 if len(labels) % self.legend_ncol != 0 else 0)
+            ax[0].legend(lines, labels, ncol=ncol, title=self.legend_title, loc=self.legend_loc)
