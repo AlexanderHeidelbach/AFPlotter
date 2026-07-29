@@ -34,9 +34,7 @@ def poisson_ratio(b: np.ndarray, a: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     ratio[mask_valid] = b[mask_valid] / a[mask_valid]
 
     with np.errstate(divide="ignore", invalid="ignore"):
-        err[mask_valid] = ratio[mask_valid] * np.sqrt(
-            (1.0 / b[mask_valid]) + (1.0 / a[mask_valid])
-        )
+        err[mask_valid] = ratio[mask_valid] * np.sqrt((1.0 / b[mask_valid]) + (1.0 / a[mask_valid]))
 
     return ratio, err
 
@@ -196,7 +194,6 @@ class HistogramPlot:
     def _prepare_data(self) -> None:
         assert self.data_hist is not None
 
-
     def plot_stacked(self) -> None:
         colors = self._fill_missing_colors(self.histogram.get_colors())
 
@@ -220,11 +217,7 @@ class HistogramPlot:
                 self.histogram.get_bin_centers()[0],
                 height=2 * self.histogram.get_total_bin_errors() / scalefactor,
                 width=self.histogram.get_bin_width(),
-                bottom=(
-                    self.histogram.get_total_bin_count()
-                    - self.histogram.get_total_bin_errors()
-                )
-                / scalefactor,
+                bottom=(self.histogram.get_total_bin_count() - self.histogram.get_total_bin_errors()) / scalefactor,
                 color="black",
                 hatch="///////",
                 fill=False,
@@ -256,9 +249,7 @@ class HistogramPlot:
 
         if labels is None:
             labels = [None] * len(centers)
-        for center, weight, error, label, color, hatch in zip(
-            centers, weights, errors, labels, colors, hatches
-        ):
+        for center, weight, error, label, color, hatch in zip(centers, weights, errors, labels, colors, hatches):
             self.ax.hist(
                 center,
                 bins=self.histogram.binning,  # type: ignore
@@ -274,11 +265,7 @@ class HistogramPlot:
             )
 
             if self.uncertainty:
-                scalefactor = (
-                    np.sum(weight * self.histogram.get_bin_width())
-                    if self.density
-                    else 1
-                )
+                scalefactor = np.sum(weight * self.histogram.get_bin_width()) if self.density else 1
                 self.ax.bar(
                     center,
                     height=2 * error / scalefactor,
@@ -426,13 +413,9 @@ class Histogram2DPlot:
 
         # Validate consistency
         if (x_is_signal and not y_is_signal) or (y_is_signal and not x_is_signal):
-            raise ValueError(
-                "Mismatch in data types: one histogram is signal and the other is default."
-            )
+            raise ValueError("Mismatch in data types: one histogram is signal and the other is default.")
         if (x_is_entry and not y_is_entry) or (y_is_entry and not x_is_entry):
-            raise ValueError(
-                "Mismatch in data types: one histogram is default and the other is signal."
-            )
+            raise ValueError("Mismatch in data types: one histogram is default and the other is signal.")
 
         # Use signal data if both are signal
         if x_is_signal and y_is_signal:
@@ -480,9 +463,7 @@ class HistogramPlotter(BasePlotter):
 
     @property
     def xlabel(self) -> str:
-        return self.variable.name + (
-            " (" + self.variable.unit + ")" if self.variable.unit else ""
-        )
+        return self.variable.name + (" (" + self.variable.unit + ")" if self.variable.unit else "")
 
     @property
     def ylabel(self) -> str:
@@ -669,9 +650,7 @@ class HistogramPlotter(BasePlotter):
 
         bin_centers = self.histplot.histogram.get_bin_centers()[0]
         bin_centers_data = self.histplot.data_hist.get_bin_centers()[0]
-        assert np.all(
-            bin_centers == bin_centers_data
-        ), "Bin centers of data and model do not match!"
+        assert np.all(bin_centers == bin_centers_data), "Bin centers of data and model do not match!"
         bin_width = self.histplot.histogram.get_bin_width()
         y_hist = self.histplot.histogram.get_total_bin_count()
         y_err = self.histplot.histogram.get_total_bin_errors()
@@ -776,9 +755,7 @@ class HistogramPlotter(BasePlotter):
         else:
             self.pull_label = "$\\frac{N_{\\rm data}-N_{\\rm MC}}{\\sqrt{\\sigma_{\\rm data}^2 + \\sigma_{\\rm MC}^2}}$"
 
-    def add_colormap(
-        self, min_val: float, max_val: float, cmap: str = "viridis", label: str = ""
-    ) -> None:
+    def add_colormap(self, min_val: float, max_val: float, cmap: str = "viridis", label: str = "") -> None:
         self.color_map_kwargs = {
             "min_val": min_val,
             "max_val": max_val,
@@ -875,15 +852,11 @@ class Histogram2DPlotter(BasePlotter):
 
     @property
     def xlabel(self) -> str:
-        return self.xvariable.name + (
-            " (" + self.xvariable.unit + ")" if self.xvariable.unit else ""
-        )
+        return self.xvariable.name + (" (" + self.xvariable.unit + ")" if self.xvariable.unit else "")
 
     @property
     def ylabel(self) -> str:
-        return self.yvariable.name + (
-            " (" + self.yvariable.unit + ")" if self.yvariable.unit else ""
-        )
+        return self.yvariable.name + (" (" + self.yvariable.unit + ")" if self.yvariable.unit else "")
 
     def add_generic_plot(self, generic_plot: GenericPlot) -> None:
         self.generic_plots.append(generic_plot)

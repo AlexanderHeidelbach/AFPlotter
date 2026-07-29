@@ -36,15 +36,11 @@ class LazyHistEntry(HistogramEntry):
             elif all(isinstance(d, pl.LazyFrame) for d in self.input):
                 data = pl.concat(self.input)  # type: ignore
             else:
-                raise ValueError(
-                    "All elements in the data list must be of the same type (Path/str or LazyFrame)."
-                )
+                raise ValueError("All elements in the data list must be of the same type (Path/str or LazyFrame).")
         elif isinstance(self.input, pl.LazyFrame):
             data = self.input
         else:
-            raise ValueError(
-                "Data must be a LazyFrame, a path/str, or a list of LazyFrames/paths/str."
-            )
+            raise ValueError("Data must be a LazyFrame, a path/str, or a list of LazyFrames/paths/str.")
 
         # Apply query-string-based prefilter if provided
         if self.prefilter:
@@ -129,9 +125,7 @@ class LazyHistWrapper:
     ) -> np.ndarray:
         array_bins = np.array([])
         if isinstance(bins, tuple):
-            array_bins = np.linspace(
-                bins[0], bins[1], bins[2] if len(bins) == 3 else 50
-            )
+            array_bins = np.linspace(bins[0], bins[1], bins[2] if len(bins) == 3 else 50)
         elif isinstance(bins, list):
             array_bins = np.array(bins)
         elif isinstance(bins, int):
@@ -143,9 +137,7 @@ class LazyHistWrapper:
 
         return array_bins
 
-    def add_lazy_entry(
-        self, entries: LazyHistEntry | list[LazyHistEntry]
-    ) -> None:
+    def add_lazy_entry(self, entries: LazyHistEntry | list[LazyHistEntry]) -> None:
         if not self.state.is_preparation:
             raise Exception("Can only add lazy entries before querying histograms")
 
@@ -173,11 +165,7 @@ class LazyHistWrapper:
 
         array_bins = self.get_bins(bins)
 
-        uid = (
-            identifier
-            if identifier
-            else self.get_uid(column, array_bins, filters, entries_to_hist)
-        )
+        uid = identifier if identifier else self.get_uid(column, array_bins, filters, entries_to_hist)
 
         # Store histogram configuration and metadata
         self.hist_configs[uid] = {
@@ -242,9 +230,7 @@ class LazyHistWrapper:
 
     def lazy_execute(self) -> None:
         if not self.state.is_state(WrapperState.HIST):
-            raise Exception(
-                f"Can only execute after adding hists, but found state: {self.state.name}"
-            )
+            raise Exception(f"Can only execute after adding hists, but found state: {self.state.name}")
 
         # Iterate over all entries to handle their histograms
         for entry_name, entry in self.entries.items():
@@ -253,10 +239,7 @@ class LazyHistWrapper:
                 for config in self.hist_configs.values()
                 if (
                     config["entries_to_hist"] is None  # Applies to all entries
-                    or (
-                        isinstance(config["entries_to_hist"], list)
-                        and entry_name in config["entries_to_hist"]
-                    )
+                    or (isinstance(config["entries_to_hist"], list) and entry_name in config["entries_to_hist"])
                     or entry_name == config["entries_to_hist"]
                 )
             ]
@@ -276,9 +259,7 @@ class LazyHistWrapper:
                         expr = SelectionParser(hist["filters"]).parse()
                         filtered_lf = lf.filter(expr)
                     except Exception as e:
-                        raise ValueError(
-                            f"Failed to parse filter for histogram {hist['uid']}: {e}"
-                        )
+                        raise ValueError(f"Failed to parse filter for histogram {hist['uid']}: {e}")
 
                 interessted_columns = []
                 if hist["type"] == "1D":
@@ -312,9 +293,7 @@ class LazyHistWrapper:
 
                     self.histograms[uid].binning = config["bins"]
                     self.histograms[uid].add_entry(hist_entry, clear=True)
-                    self.histograms[uid].metadata.update(
-                        {"column_name": config["column"]}
-                    )
+                    self.histograms[uid].metadata.update({"column_name": config["column"]})
                     self.histograms[uid].metadata.update({"filters": config["filters"]})
 
                 elif config["type"] == "2D":
@@ -325,29 +304,19 @@ class LazyHistWrapper:
                     hist_yentry.array = data[:, 1] * config["yfactor"]
                     self.histograms2D[uid]["x"].binning = config["xbins"]
                     self.histograms2D[uid]["x"].add_entry(hist_xentry)
-                    self.histograms2D[uid]["x"].metadata.update(
-                        {"column_name": config["xcolumn"]}
-                    )
-                    self.histograms2D[uid]["x"].metadata.update(
-                        {"filters": config["filters"]}
-                    )
+                    self.histograms2D[uid]["x"].metadata.update({"column_name": config["xcolumn"]})
+                    self.histograms2D[uid]["x"].metadata.update({"filters": config["filters"]})
 
                     self.histograms2D[uid]["y"].binning = config["ybins"]
                     self.histograms2D[uid]["y"].add_entry(hist_yentry)
-                    self.histograms2D[uid]["y"].metadata.update(
-                        {"column_name": config["ycolumn"]}
-                    )
-                    self.histograms2D[uid]["y"].metadata.update(
-                        {"filters": config["filters"]}
-                    )
+                    self.histograms2D[uid]["y"].metadata.update({"column_name": config["ycolumn"]})
+                    self.histograms2D[uid]["y"].metadata.update({"filters": config["filters"]})
 
         self.state.set_state(WrapperState.EXECUTED)
 
     def get_hist(self, identifier: str) -> Histogram:
         if not self.state.is_state(WrapperState.EXECUTED):
-            raise Exception(
-                f"Can only get histograms after execution, but found state: {self.state.name}"
-            )
+            raise Exception(f"Can only get histograms after execution, but found state: {self.state.name}")
         if identifier not in self.histograms.keys():
             raise KeyError(f"Identifier '{identifier}' not found for 1D Hists.")
         else:
@@ -355,9 +324,7 @@ class LazyHistWrapper:
 
     def get_2Dhist(self, identifier: str) -> dict[str, Histogram]:
         if not self.state.is_state(WrapperState.EXECUTED):
-            raise Exception(
-                f"Can only get histograms after execution, but found state: {self.state.name}"
-            )
+            raise Exception(f"Can only get histograms after execution, but found state: {self.state.name}")
         if identifier not in self.histograms2D.keys():
             raise KeyError(f"Identifier '{identifier}' not found for 2D Hists.")
         else:
@@ -365,14 +332,10 @@ class LazyHistWrapper:
 
     def get_all_hists(self) -> dict[str, Histogram]:
         if not self.state.is_state(WrapperState.EXECUTED):
-            raise Exception(
-                f"Can only get histograms after execution, but found state: {self.state.name}"
-            )
+            raise Exception(f"Can only get histograms after execution, but found state: {self.state.name}")
         return self.histograms
 
     def get_all_2Dhists(self) -> dict[str, dict[str, Histogram]]:
         if not self.state.is_state(WrapperState.EXECUTED):
-            raise Exception(
-                f"Can only get histograms after execution, but found state: {self.state.name}"
-            )
+            raise Exception(f"Can only get histograms after execution, but found state: {self.state.name}")
         return self.histograms2D

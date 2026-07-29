@@ -58,9 +58,7 @@ def test_kit_palette_survives_an_experiment_switch_end_to_end():
     hist.binning = np.linspace(0, 10, 21)
     hist.add_entry(HistogramEntry(name="bkg0", latex_name="B0", array=rng.uniform(0, 10, 400)))
     hist.add_entry(HistogramEntry(name="bkg1", latex_name="B1", array=rng.uniform(0, 10, 400)))
-    hist.add_entry(
-        HistogramEntry(name="sig0", latex_name="S0", array=rng.normal(5, 1, 300), type="signal")
-    )
+    hist.add_entry(HistogramEntry(name="sig0", latex_name="S0", array=rng.normal(5, 1, 300), type="signal"))
 
     histplot = HistogramPlot(hist)
     histplot.stacked = True
@@ -68,10 +66,7 @@ def test_kit_palette_survives_an_experiment_switch_end_to_end():
     plotter = HistogramPlotter(histplot, HistogramVariable("$M$", "GeV"))
     ax, _ = plotter.plot(save=False)
 
-    colors = {
-        patch.get_label(): (to_hex(patch.get_facecolor()), to_hex(patch.get_edgecolor()))
-        for patch in ax.patches
-    }
+    colors = {patch.get_label(): (to_hex(patch.get_facecolor()), to_hex(patch.get_edgecolor())) for patch in ax.patches}
     plt.close(ax.figure)
 
     assert colors["B0"][0] == palettes.KIT_PALETTE.background[0]

@@ -56,9 +56,7 @@ def test_histogram_plot_stacked(synthetic_histogram):
 def test_histogram_plot_data_only(synthetic_histogram):
     data_hist = Histogram()
     data_hist.binning = synthetic_histogram.binning
-    data_hist.add_entry(
-        HistogramEntry(name="Data", array=np.random.default_rng(1).normal(5, 1, 300))
-    )
+    data_hist.add_entry(HistogramEntry(name="Data", array=np.random.default_rng(1).normal(5, 1, 300)))
     histplot = HistogramPlot(synthetic_histogram)
     histplot.data_hist = data_hist
     histplot.data_only = True
@@ -73,9 +71,7 @@ def test_histogram_2d_plot(synthetic_histogram):
     xhist = synthetic_histogram
     yhist = Histogram()
     yhist.binning = np.linspace(0, 10, 21)
-    yhist.add_entry(
-        HistogramEntry(name="signal", array=np.random.default_rng(2).normal(5, 1, 500))
-    )
+    yhist.add_entry(HistogramEntry(name="signal", array=np.random.default_rng(2).normal(5, 1, 500)))
     plot2d = Histogram2DPlot(xhist, yhist)
     fig, ax = plt.subplots()
     plot2d.ax = ax
@@ -218,10 +214,7 @@ def _rendered_step_colors_and_hatches(hist: Histogram) -> dict[str, tuple[str, s
     histplot.stacked = False
     plotter = HistogramPlotter(histplot, HistogramVariable("$M$", "GeV"))
     ax, _ = plotter.plot(save=False)
-    result = {
-        patch.get_label(): (to_hex(patch.get_edgecolor()), patch.get_hatch())
-        for patch in ax.patches
-    }
+    result = {patch.get_label(): (to_hex(patch.get_edgecolor()), patch.get_hatch()) for patch in ax.patches}
     plt.close(ax.figure)
     return result
 
@@ -230,13 +223,14 @@ def test_step_backfills_only_missing_entry_colors_and_keeps_hatches():
     hist = _uncolored_histogram(n_entries=0)
     hist.add_entry(
         HistogramEntry(
-            name="bkg0", latex_name="B0", array=np.random.default_rng(1).uniform(0, 10, 400),
-            color="#00ff00", hatch="///",
+            name="bkg0",
+            latex_name="B0",
+            array=np.random.default_rng(1).uniform(0, 10, 400),
+            color="#00ff00",
+            hatch="///",
         )
     )
-    hist.add_entry(
-        HistogramEntry(name="bkg1", latex_name="B1", array=np.random.default_rng(2).uniform(0, 10, 400))
-    )
+    hist.add_entry(HistogramEntry(name="bkg1", latex_name="B1", array=np.random.default_rng(2).uniform(0, 10, 400)))
     result = _rendered_step_colors_and_hatches(hist)
     assert result["B0"] == ("#00ff00", "///")
     assert result["B1"][0] == PETROFF_PALETTE.background[1]

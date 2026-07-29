@@ -8,9 +8,11 @@ from typing import Any
 import polars as pl
 from afplotter.baseplotter import PathType
 
+
 def read_json(filename: PathType) -> dict[str, Any]:
     with open(filename, "r") as f:
         return json.load(f)
+
 
 class SelectionParser:
     """
@@ -57,10 +59,7 @@ class SelectionParser:
         elif isinstance(node, ast.Compare):
             operands = [self._parse_expr(node.left, in_lhs_of_comparison=True)]
             operands.extend(self._parse_expr(comparator) for comparator in node.comparators)
-            comparisons = (
-                self.OPS[type(op)](operands[i], operands[i + 1])
-                for i, op in enumerate(node.ops)
-            )
+            comparisons = (self.OPS[type(op)](operands[i], operands[i + 1]) for i, op in enumerate(node.ops))
             return reduce(operator.and_, comparisons)
 
         elif isinstance(node, ast.Name):
@@ -103,9 +102,7 @@ class SelectionOperator:
         elif selections is not None:
             self.selections = selections
         else:
-            raise ValueError(
-                "Either selections_path or selections must be provided."
-            )
+            raise ValueError("Either selections_path or selections must be provided.")
 
     def _load_query_string(self, selections_path: str | Path) -> dict[str, str]:
         """
@@ -122,9 +119,7 @@ class SelectionOperator:
         missing = [col for col in used_columns if col not in available_columns]
 
         if missing:
-            raise ValueError(
-                f"The following columns used in the query do not exist in the LazyFrame: {missing}"
-            )
+            raise ValueError(f"The following columns used in the query do not exist in the LazyFrame: {missing}")
 
     def apply_selections(self) -> pl.LazyFrame:
         """
