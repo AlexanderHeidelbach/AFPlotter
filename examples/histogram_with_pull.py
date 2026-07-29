@@ -34,8 +34,8 @@ def main() -> None:
 
     hist = Histogram()
     hist.binning = np.linspace(x_min, x_max, 41)
-    # Colors are all-or-nothing per stack: set every entry or none of them (in
-    # which case the Petroff cycle supplies them in order).
+    # Any entry without an explicit color is backfilled from the active cycle;
+    # entries that do set one (like these) keep it.
     hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=PETROFF_PALETTE.signal))
     hist.add_entry(
         HistogramEntry(name="background", latex_name="Background", array=data["background"], color=PetroffColors.blue)

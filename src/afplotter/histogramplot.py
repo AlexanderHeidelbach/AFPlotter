@@ -189,14 +189,17 @@ class HistogramPlot:
         colormap = dict(plt.rcParams)["axes.prop_cycle"].by_key()["color"]
         return [colormap[i % len(colormap)] for i in range(n)]
 
+    @staticmethod
+    def _fill_missing_colors(colors: list[str | None]) -> list[str]:
+        cycle = HistogramPlot.std_colors(len(colors))
+        return [color if color is not None else cycle[i] for i, color in enumerate(colors)]
+
     def _prepare_data(self) -> None:
         assert self.data_hist is not None
 
 
     def plot_stacked(self) -> None:
-        colors = self.histogram.get_colors()
-        if not all((color is not None) for color in colors):
-            colors = self.std_colors(len(self.histogram.entries))
+        colors = self._fill_missing_colors(self.histogram.get_colors())
 
         self.ax.hist(
             self.histogram.get_bin_centers(),
@@ -237,23 +240,15 @@ class HistogramPlot:
             weights = self.histogram.get_bin_counts()
             errors = self.histogram.get_bin_errors()
             labels = self.histogram.get_latex_names()
-            if any(color is None for color in self.histogram.get_colors()):
-                colors = self.std_colors(len(self.histogram.entries))
-                hatches = [None] * len(self.histogram.entries)
-            else:
-                colors = self.histogram.get_colors()
-                hatches = self.histogram.get_hatches()
+            colors = self._fill_missing_colors(self.histogram.get_colors())
+            hatches = self.histogram.get_hatches()
         else:
             centers = [self.histogram.get_bin_centers()[0]] * len(self.histogram.signal)
             weights = self.histogram.get_signal_bin_counts()
             errors = self.histogram.get_signal_bin_errors()
             labels = self.histogram.get_signal_latex_names()
             if len(self.histogram.signal) != 1:
-                if any(color is None for color in self.histogram.get_signal_colors()):
-                    colors = self.std_colors(len(self.histogram.signal))
-                else:
-                    colors = self.histogram.get_signal_colors()
-
+                colors = self._fill_missing_colors(self.histogram.get_signal_colors())
             else:
                 # A lone signal component is always drawn in the reserved signal
                 # colour, overriding any explicitly set HistogramEntry.color.

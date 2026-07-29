@@ -200,6 +200,44 @@ def test_multiple_signals_fall_back_to_the_cycle():
     assert get_palette().signal not in signal_edges
 
 
+def test_stacked_backfills_only_missing_entry_colors():
+    hist = _uncolored_histogram(n_entries=0)
+    hist.add_entry(HistogramEntry(name="bkg0", latex_name="B0", array=np.random.default_rng(1).uniform(0, 10, 400), color="#00ff00"))
+    hist.add_entry(HistogramEntry(name="bkg1", latex_name="B1", array=np.random.default_rng(2).uniform(0, 10, 400)))
+    colors = _rendered_colors(hist)
+    assert colors["B0"][0] == "#00ff00"
+    assert colors["B1"][0] == PETROFF_PALETTE.background[1]
+
+
+def _rendered_step_colors_and_hatches(hist: Histogram) -> dict[str, tuple[str, str | None]]:
+    histplot = HistogramPlot(hist)
+    histplot.stacked = False
+    plotter = HistogramPlotter(histplot, HistogramVariable("$M$", "GeV"))
+    ax, _ = plotter.plot(save=False)
+    result = {
+        patch.get_label(): (to_hex(patch.get_edgecolor()), patch.get_hatch())
+        for patch in ax.patches
+    }
+    plt.close(ax.figure)
+    return result
+
+
+def test_step_backfills_only_missing_entry_colors_and_keeps_hatches():
+    hist = _uncolored_histogram(n_entries=0)
+    hist.add_entry(
+        HistogramEntry(
+            name="bkg0", latex_name="B0", array=np.random.default_rng(1).uniform(0, 10, 400),
+            color="#00ff00", hatch="///",
+        )
+    )
+    hist.add_entry(
+        HistogramEntry(name="bkg1", latex_name="B1", array=np.random.default_rng(2).uniform(0, 10, 400))
+    )
+    result = _rendered_step_colors_and_hatches(hist)
+    assert result["B0"] == ("#00ff00", "///")
+    assert result["B1"][0] == PETROFF_PALETTE.background[1]
+
+
 def test_histogram_2d_plotter_end_to_end(synthetic_histogram):
     xhist = synthetic_histogram
     yhist = Histogram()
