@@ -36,7 +36,9 @@ def main() -> None:
     hist.binning = np.linspace(x_min, x_max, 41)
     # Any entry without an explicit color is backfilled from the active cycle;
     # entries that do set one (like these) keep it.
-    hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=PETROFF_PALETTE.signal))
+    hist.add_entry(
+        HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=PETROFF_PALETTE.signal)
+    )
     hist.add_entry(
         HistogramEntry(name="background", latex_name="Background", array=data["background"], color=PetroffColors.blue)
     )
