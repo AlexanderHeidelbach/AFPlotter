@@ -202,7 +202,11 @@ def test_multiple_signals_fall_back_to_the_cycle():
 
 def test_stacked_backfills_only_missing_entry_colors():
     hist = _uncolored_histogram(n_entries=0)
-    hist.add_entry(HistogramEntry(name="bkg0", latex_name="B0", array=np.random.default_rng(1).uniform(0, 10, 400), color="#00ff00"))
+    hist.add_entry(
+        HistogramEntry(
+            name="bkg0", latex_name="B0", array=np.random.default_rng(1).uniform(0, 10, 400), color="#00ff00"
+        )
+    )
     hist.add_entry(HistogramEntry(name="bkg1", latex_name="B1", array=np.random.default_rng(2).uniform(0, 10, 400)))
     colors = _rendered_colors(hist)
     assert colors["B0"][0] == "#00ff00"

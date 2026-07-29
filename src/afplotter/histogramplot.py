@@ -183,7 +183,6 @@ class HistogramPlot:
         ]
         return [hatches_list[i % len(hatches_list)] for i in range(n)]
 
-
     @staticmethod
     def std_colors(n: int) -> list[str]:
         colormap = dict(plt.rcParams)["axes.prop_cycle"].by_key()["color"]
