@@ -54,7 +54,8 @@ plot_histogram(
 ```
 
 Colors come from the [Petroff 10](https://arxiv.org/abs/2107.02270) sequence by default,
-with its red held out of the cycle and reserved for signal components — see
+with its red held out of the cycle and reserved for signal components. Switch to KIT or LMU
+colors (or register your own) with `set_palette(...)` — see
 [Histograms → Colours](docs/histograms.md#colours).
 
 ## Docs
