@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Callable
 from matplotlib import pyplot as plt  # type: ignore
-from matplotlib.colors import to_hex  # type: ignore
 import numpy as np  # type: ignore
-import seaborn as sns  # type: ignore
 
 from afplotter.baseplotter import BasePlotter
 from afplotter.palettes import get_palette
@@ -185,13 +183,6 @@ class HistogramPlot:
         ]
         return [hatches_list[i % len(hatches_list)] for i in range(n)]
 
-    @staticmethod
-    def b2helix(n: int) -> list:
-        rgb_colors = sns.cubehelix_palette(
-            n, start=1.5, rot=1.5, dark=0.3, light=0.8, reverse=True
-        )
-        hex_colors = [to_hex(rgb) for rgb in rgb_colors]
-        return hex_colors
 
     @staticmethod
     def std_colors(n: int) -> list[str]:
