@@ -68,6 +68,9 @@ def _build_stacked_pull_plotter(data: dict[str, np.ndarray]) -> HistogramPlotter
     hist.binning = np.linspace(X_MIN, X_MAX, 41)
     hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=palette.signal))
     hist.add_entry(
+        # background[1] (not [0]): amber for Petroff, blue for KIT -- both contrast
+        # cleanly against the reserved signal red. background[0] is KIT's green,
+        # which (unlike Petroff's blue at [0]) reads muddier against signal red here.
         HistogramEntry(
             name="background", latex_name="Background", array=data["background"], color=palette.background[1]
         )
@@ -80,6 +83,14 @@ def _build_stacked_pull_plotter(data: dict[str, np.ndarray]) -> HistogramPlotter
     variable = HistogramVariable("$p_T$", "GeV")
     plotter = HistogramPlotter(histplot, variable)
     plotter.watermark = "(Own Work)"
+    # "best" (the default) places the legend over the empty upper-left corner of the
+    # axes -- which is exactly where the watermark text lives, so it occludes
+    # "(Own Work)". With the default legend_ncol=4 the 5 legend entries here wrap
+    # into a 2-column box wide enough to span the axes regardless of anchor, so also
+    # force a single narrow column (legend_ncol >= len(labels)) before anchoring it
+    # to the upper-right corner, away from the watermark.
+    plotter.legend_ncol = 5
+    plotter.legend_loc = "upper right"
 
     plotter.add_function(_model, binwidth=True, label="Model", color=PetroffColors.purple, lw=2)
     plotter.add_pull(_model, binwidth=True, color=PetroffColors.purple, label="Model", lw=2, max_sigma=5.0)

@@ -1,7 +1,7 @@
 # AFPlotter examples
 
 Runnable scripts using synthetic data (no real analysis data required).
-Each writes a PNG to `examples/output/` (gitignored).
+Each writes a PNG to `examples/output/` (gitignored), except where noted below.
 
 - `histogram_with_pull.py` — stacked histogram + model curve + pull panel,
   mirroring a typical fit-result plot.

@@ -77,7 +77,7 @@ The convenience layer handles this in one call: `plot_histogram(entries, bins, s
 
 A pull panel needs the full engine, not the convenience layer, so this escalates to
 `Histogram`/`HistogramEntry` → `HistogramPlot` → `HistogramPlotter`, with `add_function` and
-`add_pull` for the model overlay and pull panel.
+`add_pull` for the model overlay and pull panel, and pins signal to the reserved palette red.
 
 > Switch to KIT colors
 
