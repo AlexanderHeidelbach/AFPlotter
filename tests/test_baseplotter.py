@@ -1,10 +1,13 @@
 import os
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 
 from afplotter.baseplotter import BasePlotter
+from afplotter.histogramplot import HistogramPlot, HistogramPlotter, HistogramVariable
 from afplotter.palettes import PETROFF_PALETTE, KITColors, LMUColors, PetroffColors, get_palette
+from afplotter.utilities.histogram import Histogram, HistogramEntry
 from afplotter.experiments.context import set_experiment
 
 
@@ -194,6 +197,37 @@ def test_add_text_to_plot_luminosity_spacing_holds_at_reduced_font_size():
     luminosity_bbox = _bbox(ax, renderer, plotter.luminosity)
     assert watermark_bbox.y0 >= luminosity_bbox.y1
     plt.close(fig)
+
+
+def test_add_text_to_plot_luminosity_does_not_overlap_watermark_through_real_plotter_pipeline():
+    """Integration regression: the unit-level tests above call `_add_text_to_plot`
+    directly against a bare `plt.subplots()` axes, so they never exercise the real
+    `HistogramPlotter.plot()` pipeline where `_add_axislabels`/`_add_legend` run
+    *after* `_add_text_to_plot` and `figure.autolayout` can still shrink the axes
+    box afterward (see the CLAUDE.md gotcha on layout-timing). Guards against a
+    future regression reintroducing the overlap once the real pipeline is involved."""
+    set_experiment("BelleII")
+
+    hist = Histogram()
+    hist.binning = np.linspace(-3, 3, 21)
+    hist.add_entry(HistogramEntry(name="signal", array=np.random.default_rng(0).normal(0, 1, 200)))
+    histplot = HistogramPlot(hist)
+
+    variable = HistogramVariable("x", "a.u.")
+    plotter = HistogramPlotter(histplot, variable)
+    plotter.set_matplotlibrc_params(36)
+    plotter.luminosity_value = 62.8
+    plotter.add_text("(Preliminary)")
+
+    ax, ax_diff = plotter.plot(save=False)
+    assert ax_diff is None
+
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    watermark_bbox = _bbox(ax, renderer, plotter.watermark)
+    luminosity_bbox = _bbox(ax, renderer, plotter.luminosity)
+    assert watermark_bbox.y0 >= luminosity_bbox.y1
+    plt.close(ax.figure)
 
 
 def test_add_text_to_plot_extra_text_rows_do_not_overlap_luminosity_at_large_font_size():

@@ -114,6 +114,11 @@ These bit us during development and are easy to repeat:
   See `docs/selections.md` for the supported grammar and current null/NaN semantics.
 - **`figure.autolayout` conflicts with `mpl_toolkits` insets**, producing a `tight_layout`
   warning on save. Harmless but noisy.
+- **Text-block rows are positioned from bboxes measured before layout settles.** `_add_text_to_plot` measures
+  and positions the watermark/luminosity/`add_text()` rows before `_add_axislabels`/`_add_legend` run, and
+  `figure.autolayout` can still shrink the axes box afterward — at very large `text_size` on a small `figsize`
+  this can eat into the small cushion between rows. Harmless at normal figsizes; if you hit it, increase
+  `figsize` or reduce `text_size`.
 
 ## Testing philosophy
 
