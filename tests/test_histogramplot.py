@@ -323,9 +323,7 @@ def test_uncertainty_band_covers_the_signal_layer_too():
     # accessors under test, so a regression that drops signal from the totals shows up.
     background = np.sum(hist.get_bin_counts(), axis=0)
     signal = np.sum(hist.get_raw_signal_bin_counts(), axis=0)
-    errors = np.sqrt(
-        np.sum([e**2 for e in hist.get_bin_errors() + hist.get_raw_signal_bin_errors()], axis=0)
-    )
+    errors = np.sqrt(np.sum([e**2 for e in hist.get_bin_errors() + hist.get_raw_signal_bin_errors()], axis=0))
     assert band_tops == pytest.approx(background + signal + errors)
     plt.close(ax.figure)
 

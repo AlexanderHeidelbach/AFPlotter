@@ -237,12 +237,7 @@ class Histogram:
         assert not isinstance(self.binning, int)
         assert self.binning is not None
 
-        bin_mids = np.array(
-            [
-                (self.binning[i] + self.binning[i + 1]) / 2
-                for i in range(0, len(self.binning) - 1)
-            ]
-        )
+        bin_mids = np.array([(self.binning[i] + self.binning[i + 1]) / 2 for i in range(0, len(self.binning) - 1)])
         return [bin_mids for _ in range(len(self.entries) + len(self.signal))]
 
     def get_bin_width(self) -> float:

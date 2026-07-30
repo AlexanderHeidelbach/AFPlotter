@@ -206,9 +206,7 @@ class HistogramPlot:
             bin_counts = self.histogram.get_bin_counts()
             labels = self.histogram.get_latex_names()
             total_count = np.sum(self.histogram.get_bin_counts(), axis=0)
-            total_errors = np.sqrt(
-                np.sum([errors**2 for errors in self.histogram.get_bin_errors()], axis=0)
-            )
+            total_errors = np.sqrt(np.sum([errors**2 for errors in self.histogram.get_bin_errors()], axis=0))
             scale = float(np.sum(total_count * self.histogram.get_bin_width()))
         else:
             # Signal components are appended last, so they always end up as the topmost
