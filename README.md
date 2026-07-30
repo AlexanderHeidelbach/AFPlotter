@@ -47,7 +47,8 @@ rng = np.random.default_rng(0)
 plot_histogram(
     entries={"signal": rng.normal(5, 1, 500), "background": rng.uniform(0, 10, 1000)},
     bins=(0, 10, 41),
-    xlabel="p_T (GeV)",
+    xlabel="p_T",
+    unit="GeV",
     stacked=True,
     save="pt.png",
 )
