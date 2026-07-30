@@ -295,6 +295,7 @@ class BasePlotter(ABC):
         """Handling of different texts in the plot."""
         x = self.watermark_position[0]
         y = self.watermark_position[1]
+        row_margin = 0.01
         experiment_text = ax.text(
             x,
             y,
@@ -312,7 +313,7 @@ class BasePlotter(ABC):
         ax.figure.canvas.draw()
         renderer = ax.figure.canvas.get_renderer()  # type: ignore
         experiment_bbox = experiment_text.get_window_extent(renderer=renderer).transformed(ax.transAxes.inverted())
-        ax.text(
+        watermark_text = ax.text(
             experiment_bbox.x1 + 0.02,
             y,
             self.watermark,
@@ -321,29 +322,41 @@ class BasePlotter(ABC):
             alpha=0.8,
             fontsize=plt.rcParams["xtick.labelsize"],
         )
+        # Rows below this one start from the lower of the two texts sharing
+        # it, so spacing tracks whichever glyph actually descends furthest
+        # (e.g. italics, descenders, or — for the luminosity row below — the
+        # tall integral sign) instead of a fixed fraction tuned for one font
+        # size only.
+        watermark_bbox = watermark_text.get_window_extent(renderer=renderer).transformed(ax.transAxes.inverted())
+        y_cursor = min(experiment_bbox.y0, watermark_bbox.y0) - row_margin
+
         if self.luminosity_value:
-            ax.text(
+            luminosity_text = ax.text(
                 x,
-                y - 0.06,
+                y_cursor,
                 self.luminosity,
                 ha="left",
+                va="top",
                 transform=ax.transAxes,
                 alpha=0.8,
                 fontsize=plt.rcParams["xtick.labelsize"],
             )
-        if self.text:
-            [
-                ax.text(
-                    x,
-                    y - 0.076 - (i + 1) * 0.05,
-                    text,
-                    ha="left",
-                    transform=ax.transAxes,
-                    alpha=0.8,
-                    fontsize=plt.rcParams["legend.fontsize"],
-                )
-                for i, text in enumerate(self.text)
-            ]
+            luminosity_bbox = luminosity_text.get_window_extent(renderer=renderer).transformed(ax.transAxes.inverted())
+            y_cursor = luminosity_bbox.y0 - row_margin
+
+        for text in self.text:
+            extra_text = ax.text(
+                x,
+                y_cursor,
+                text,
+                ha="left",
+                va="top",
+                transform=ax.transAxes,
+                alpha=0.8,
+                fontsize=plt.rcParams["legend.fontsize"],
+            )
+            extra_bbox = extra_text.get_window_extent(renderer=renderer).transformed(ax.transAxes.inverted())
+            y_cursor = extra_bbox.y0 - row_margin
 
         for text_wargs in self.generic_text:
             text_wargs["transform"] = ax.transAxes

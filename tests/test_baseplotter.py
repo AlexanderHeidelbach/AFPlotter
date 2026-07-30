@@ -154,6 +154,83 @@ def test_add_text_to_plot_watermark_spacing_holds_at_reduced_font_size():
     plt.close(fig)
 
 
+def _bbox(ax, renderer, label):
+    text = {t.get_text(): t for t in ax.texts}[label]
+    return text.get_window_extent(renderer=renderer).transformed(ax.transAxes.inverted())
+
+
+def test_add_text_to_plot_luminosity_does_not_overlap_watermark_row_at_large_font_size():
+    """Regression test for the \\int glyph in the luminosity row growing tall
+    enough at large text_size to overlap the watermark row above it — this is
+    the root cause behind the reported "integral sign overlaps the watermark"
+    bug. Confirmed against the pre-fix code: gap was -0.236 (a large overlap)
+    at text_size=48 before this fix."""
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params(48)
+    plotter.luminosity_value = 408.0
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    watermark_bbox = _bbox(ax, renderer, plotter.watermark)
+    luminosity_bbox = _bbox(ax, renderer, plotter.luminosity)
+    assert watermark_bbox.y0 >= luminosity_bbox.y1
+    plt.close(fig)
+
+
+def test_add_text_to_plot_luminosity_spacing_holds_at_reduced_font_size():
+    """Regression check: the fix must not break spacing at the smaller font
+    size used by the bundled examples (examples/histogram_with_pull.py etc.)."""
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params(16)
+    plotter.luminosity_value = 408.0
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    watermark_bbox = _bbox(ax, renderer, plotter.watermark)
+    luminosity_bbox = _bbox(ax, renderer, plotter.luminosity)
+    assert watermark_bbox.y0 >= luminosity_bbox.y1
+    plt.close(fig)
+
+
+def test_add_text_to_plot_extra_text_rows_do_not_overlap_luminosity_at_large_font_size():
+    """add_text() rows must stack below the luminosity row without overlap
+    too — the fix applies to every row, not just the luminosity one."""
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params(48)
+    plotter.luminosity_value = 408.0
+    plotter.add_text("(Preliminary)")
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    luminosity_bbox = _bbox(ax, renderer, plotter.luminosity)
+    extra_bbox = _bbox(ax, renderer, "(Preliminary)")
+    assert luminosity_bbox.y0 >= extra_bbox.y1
+    plt.close(fig)
+
+
+def test_add_text_to_plot_multiple_extra_text_rows_stack_without_overlap():
+    """Two add_text() rows must not overlap each other either."""
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params(48)
+    plotter.add_text("(Preliminary)")
+    plotter.add_text("Signal region")
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    first_bbox = _bbox(ax, renderer, "(Preliminary)")
+    second_bbox = _bbox(ax, renderer, "Signal region")
+    assert first_bbox.y0 >= second_bbox.y1
+    plt.close(fig)
+
+
 def test_set_axislimits_linear_expands_ylim_for_legend():
     plotter = ConcretePlotter()
     plotter.legend_ncol = 2
