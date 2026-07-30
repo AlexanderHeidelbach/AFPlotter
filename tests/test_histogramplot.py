@@ -330,18 +330,39 @@ def test_uncertainty_band_covers_the_signal_layer_too():
     plt.close(ax.figure)
 
 
-def test_sig_extra_still_draws_the_rescaled_outline_on_top_of_the_stack():
+def test_sig_extra_excludes_signal_from_the_stack():
     hist = _uncolored_histogram(n_entries=2, n_signals=1)
     ax = _render_stacked(hist, sig_extra=True)
-    # The signal now appears twice: once as a filled stack layer at its true yield,
-    # once as the unfilled peak-matched outline.
-    assert _stack_layers(ax)["S0"][0] == get_palette().signal
+    # sig_extra means the signal is drawn *only* as the peak-matched outline overlay --
+    # it must not also be a filled stack layer, or it is drawn, and legended, twice.
+    assert "S0" not in _stack_layers(ax)
     outline_color, outline_top = _overlay_outlines(ax)["S0"]
     assert outline_color == get_palette().signal
     # The outline is still peak-matched to the background stack, so it is taller than
     # the raw signal but shorter than the full S+B stack.
     background_max = float(np.max(np.sum(hist.get_bin_counts(), axis=0)))
     assert outline_top == pytest.approx(background_max)
+    plt.close(ax.figure)
+
+
+def test_sig_extra_does_not_duplicate_the_signal_legend_entry():
+    hist = _uncolored_histogram(n_entries=2, n_signals=1)
+    ax = _render_stacked(hist, sig_extra=True)
+    _, labels = ax.get_legend_handles_labels()
+    assert labels.count("S0") == 1
+
+
+def test_sig_extra_stat_unc_band_covers_background_only():
+    hist = _uncolored_histogram(n_entries=2, n_signals=1)
+    ax = _render_stacked(hist, sig_extra=True, uncertainty=True)
+    band = next(c for c in ax.containers if c.get_label() == "Stat. unc.")
+    band_tops = np.array([bar.get_y() + bar.get_height() for bar in band.patches])
+
+    # With sig_extra, signal is not part of the stack, so the band must hug the
+    # background-only bars underneath it, not the S+B total.
+    background = np.sum(hist.get_bin_counts(), axis=0)
+    errors = np.sqrt(np.sum([e**2 for e in hist.get_bin_errors()], axis=0))
+    assert band_tops == pytest.approx(background + errors)
     plt.close(ax.figure)
 
 
@@ -372,11 +393,12 @@ def test_pull_panel_compares_against_signal_plus_background():
 
 
 def test_multiple_signal_outlines_fall_back_to_the_cycle():
-    # The stack forces every signal layer red; only the sig_extra outlines fall back
-    # to the ordinary cycle when there is more than one signal.
+    # With sig_extra, signal never enters the stack (see
+    # test_sig_extra_excludes_signal_from_the_stack); only the outlines' colours are
+    # at stake here, and with more than one signal they fall back to the ordinary cycle.
     ax = _render_stacked(_uncolored_histogram(n_entries=2, n_signals=2), sig_extra=True)
     layers = _stack_layers(ax)
-    assert [layers["S0"][0], layers["S1"][0]] == [get_palette().signal, get_palette().signal]
+    assert "S0" not in layers and "S1" not in layers
     outlines = _overlay_outlines(ax)
     outline_colors = [outlines["S0"][0], outlines["S1"][0]]
     assert outline_colors == PETROFF_PALETTE.background[:2]
