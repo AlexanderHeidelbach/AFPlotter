@@ -68,7 +68,9 @@ def _build_stacked_pull_plotter(data: dict[str, np.ndarray]) -> HistogramPlotter
     hist.binning = np.linspace(X_MIN, X_MAX, 41)
     hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=palette.signal))
     hist.add_entry(
-        HistogramEntry(name="background", latex_name="Background", array=data["background"], color=palette.background[1])
+        HistogramEntry(
+            name="background", latex_name="Background", array=data["background"], color=palette.background[1]
+        )
     )
 
     histplot = HistogramPlot(hist)
