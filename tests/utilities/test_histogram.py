@@ -86,6 +86,53 @@ def test_histogram_total_bin_count_and_scale():
     assert hist.get_total_scale() == pytest.approx(3.0)
 
 
+def _signal_and_background() -> Histogram:
+    """One background entry and one signal entry over two bins."""
+    hist = Histogram()
+    hist.binning = np.array([0.0, 1.0, 2.0])
+    hist.add_entry(HistogramEntry(name="bkg", array=np.array([0.5, 0.5, 0.5, 1.5])))
+    hist.add_entry(HistogramEntry(name="sig", array=np.array([0.5, 1.5]), type="signal"))
+    return hist
+
+
+def test_totals_include_the_signal():
+    hist = _signal_and_background()
+    # background is [3, 1], signal is [1, 1]
+    assert hist.get_bin_counts()[0].tolist() == [3.0, 1.0]
+    assert hist.get_raw_signal_bin_counts()[0].tolist() == [1.0, 1.0]
+    assert hist.get_total_bin_count().tolist() == [4.0, 2.0]
+    assert hist.get_total_scale() == pytest.approx(6.0)
+
+
+def test_total_bin_errors_include_the_signal():
+    hist = _signal_and_background()
+    # Poisson errors are sqrt(N) per entry, added in quadrature over the stack,
+    # so background [3, 1] plus signal [1, 1] gives sqrt(3 + 1) and sqrt(1 + 1).
+    assert hist.get_total_bin_errors().tolist() == [
+        pytest.approx(np.sqrt(4.0)),
+        pytest.approx(np.sqrt(2.0)),
+    ]
+
+
+def test_stacked_accessors_put_signal_last():
+    hist = _signal_and_background()
+    counts = hist.get_stacked_bin_counts()
+    assert len(counts) == 2
+    assert counts[-1].tolist() == [1.0, 1.0]  # signal closes the stack
+    assert len(hist.get_stacked_bin_centers()) == 2
+    hist.entries["bkg"].latex_name = "Bkg"
+    hist.signal["sig"].latex_name = "Sig"
+    assert hist.get_stacked_latex_names() == ["Bkg", "Sig"]
+
+
+def test_raw_signal_counts_are_not_peak_matched():
+    """get_signal_bin_counts() rescales for the overlay; the stacked counts must not."""
+    hist = _signal_and_background()
+    assert hist.get_raw_signal_bin_counts()[0].tolist() == [1.0, 1.0]
+    # the overlay version is scaled up to the background stack maximum (3)
+    assert hist.get_signal_bin_counts()[0].tolist() == [3.0, 3.0]
+
+
 def test_histogram_as_dict_and_from_dict_roundtrip():
     hist = Histogram()
     hist.binning = np.array([0.0, 1.0, 2.0])

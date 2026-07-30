@@ -66,25 +66,49 @@ background cycle and reserves it exclusively for signal — so switching palette
 reintroduces a background/signal colour clash. Register a custom palette with
 `afplotter.palettes.register_palette(Palette(name=..., background=[...], signal=...))`.
 
-An entry with `type="signal"` is routed into `Histogram.signal` and drawn as an
-outlined step overlay when `HistogramPlot.sig_extra = True`:
+## Signal components
+
+An entry with `type="signal"` is routed into `Histogram.signal` instead of
+`Histogram.entries`. In a stacked plot it is **always drawn last, so it sits on top of
+the stack**, filled in `get_palette().signal` at its true yield:
 
 ```python
-from afplotter import Histogram, HistogramEntry, HistogramPlot, get_palette
+from afplotter import Histogram, HistogramEntry, HistogramPlot
 
+hist.add_entry(HistogramEntry(name="bkg", latex_name="Background", array=bkg_array))
 hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=sig_array, type="signal"))
 
 histplot = HistogramPlot(hist)
-histplot.stacked = True    # `entries` form the stack
-histplot.sig_extra = True  # `signal` is overlaid on top, in get_palette().signal
+histplot.stacked = True     # backgrounds stacked, signal closes the stack on top
+histplot.uncertainty = True # the band covers the full S+B stack
 ```
+
+Stack order among the backgrounds is `Histogram.order_entries(...)`; signal ignores it
+and always ends up topmost.
+
+Because signal is a stack layer, it counts toward the modelled total:
+`get_total_bin_count()` and `get_total_bin_errors()` are **S+B**, so the `Stat. unc.`
+band covers the whole stack and `add_pull(model)` compares your model against signal
+plus background.
+
+### The `sig_extra` outline overlay
+
+`HistogramPlot.sig_extra = True` is for a signal too small to see at its true yield: it
+draws the signal as an unfilled step outline, **peak-matched** to the background stack
+(`get_signal_bin_counts()` rescales; `get_raw_signal_bin_counts()` does not), and
+**excludes it from the stack entirely** — bars, legend entry, and the `Stat. unc.` band
+all fall back to background-only. Signal never appears in both places at once; with
+`sig_extra = True`, the peak-matched outline is its *only* representation.
 
 Caveats worth knowing:
 
 - When there is exactly **one** signal component it is always drawn in the active
-  palette's reserved signal colour; an explicit `color=` on that entry is ignored.
+  palette's reserved signal colour (`get_palette().signal`); an explicit `color=` on
+  that entry is ignored.
 - When there are **several** signal components, each one keeps its explicit `color=`
-  if it has one, and is backfilled from the ordinary cycle otherwise.
+  if it has one, and is backfilled from the ordinary cycle otherwise. This applies both
+  to signal stacked at true yield and to `sig_extra` outlines.
+- Step mode (`stacked = False`) is unaffected: signals only appear there via `sig_extra`.
 - `KITColors` and `LMUColors` are still exported and unchanged — they are just not
   the default; use them directly for one-off colours, or via `KIT_PALETTE`/`LMU_PALETTE`
   through `set_palette(...)`.

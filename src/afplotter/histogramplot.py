@@ -197,11 +197,33 @@ class HistogramPlot:
     def plot_stacked(self) -> None:
         colors = self._fill_missing_colors(self.histogram.get_colors())
 
+        # sig_extra draws the signal separately, peak-matched, via plot_step(True);
+        # it must be excluded here or it is both stacked and outlined -- drawn, and
+        # legended, twice. See histogram.get_bin_counts()/get_latex_names(), the
+        # pre-stack (entries-only) accessors, in that branch.
+        if self.sig_extra:
+            bin_centers = self.histogram.get_bin_centers()
+            bin_counts = self.histogram.get_bin_counts()
+            labels = self.histogram.get_latex_names()
+            total_count = np.sum(self.histogram.get_bin_counts(), axis=0)
+            total_errors = np.sqrt(np.sum([errors**2 for errors in self.histogram.get_bin_errors()], axis=0))
+            scale = float(np.sum(total_count * self.histogram.get_bin_width()))
+        else:
+            # Signal components are appended last, so they always end up as the topmost
+            # layer of the stack, drawn at their true yield in the reserved signal colour.
+            colors = list(colors) + [get_palette().signal] * len(self.histogram.signal)
+            bin_centers = self.histogram.get_stacked_bin_centers()
+            bin_counts = self.histogram.get_stacked_bin_counts()
+            labels = self.histogram.get_stacked_latex_names()
+            total_count = self.histogram.get_total_bin_count()
+            total_errors = self.histogram.get_total_bin_errors()
+            scale = self.histogram.get_total_scale()
+
         self.ax.hist(
-            self.histogram.get_bin_centers(),
+            bin_centers,
             bins=self.histogram.binning,  # type: ignore
-            weights=self.histogram.get_bin_counts(),
-            label=self.histogram.get_latex_names(),  # type: ignore
+            weights=bin_counts,
+            label=labels,  # type: ignore
             color=colors,  # type: ignore
             histtype="stepfilled",
             stacked=True,
@@ -212,12 +234,12 @@ class HistogramPlot:
         )  # noqa
 
         if self.uncertainty:
-            scalefactor = self.histogram.get_total_scale() if self.density else 1
+            scalefactor = scale if self.density else 1
             self.ax.bar(
                 self.histogram.get_bin_centers()[0],
-                height=2 * self.histogram.get_total_bin_errors() / scalefactor,
+                height=2 * total_errors / scalefactor,
                 width=self.histogram.get_bin_width(),
-                bottom=(self.histogram.get_total_bin_count() - self.histogram.get_total_bin_errors()) / scalefactor,
+                bottom=(total_count - total_errors) / scalefactor,
                 color="black",
                 hatch="///////",
                 fill=False,
