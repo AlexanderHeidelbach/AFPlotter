@@ -75,6 +75,16 @@ def test_luminosity_formats_with_zero_decimals():
     assert "408.11" not in plotter.luminosity
 
 
+def test_luminosity_uses_plain_integral_sign_not_mathtext_int():
+    """The \\int mathtext glyph has a tall ascender/descender that overlaps
+    the watermark row at large text_size; the plain unicode character avoids
+    that by rendering in the regular (non-math) font instead."""
+    plotter = ConcretePlotter()
+    plotter.luminosity_value = 408.0
+    assert "\\int" not in plotter.luminosity
+    assert "∫" in plotter.luminosity
+
+
 def test_add_text_to_plot_renders_watermark_and_luminosity():
     set_experiment("BelleII")
     plotter = ConcretePlotter()
