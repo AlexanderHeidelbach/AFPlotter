@@ -1,10 +1,13 @@
 import os
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 
 from afplotter.baseplotter import BasePlotter
+from afplotter.histogramplot import HistogramPlot, HistogramPlotter, HistogramVariable
 from afplotter.palettes import PETROFF_PALETTE, KITColors, LMUColors, PetroffColors, get_palette
+from afplotter.utilities.histogram import Histogram, HistogramEntry
 from afplotter.experiments.context import set_experiment
 
 
@@ -75,6 +78,16 @@ def test_luminosity_formats_with_zero_decimals():
     assert "408.11" not in plotter.luminosity
 
 
+def test_luminosity_uses_plain_integral_sign_not_mathtext_int():
+    """The \\int mathtext glyph has a tall ascender/descender that overlaps
+    the watermark row at large text_size; the plain unicode character avoids
+    that by rendering in the regular (non-math) font instead."""
+    plotter = ConcretePlotter()
+    plotter.luminosity_value = 408.0
+    assert "\\int" not in plotter.luminosity
+    assert "∫" in plotter.luminosity
+
+
 def test_add_text_to_plot_renders_watermark_and_luminosity():
     set_experiment("BelleII")
     plotter = ConcretePlotter()
@@ -141,6 +154,114 @@ def test_add_text_to_plot_watermark_spacing_holds_at_reduced_font_size():
     fig, ax = plt.subplots()
     plotter._add_text_to_plot(ax=ax)
     assert _watermark_gap(plotter, ax) >= 0
+    plt.close(fig)
+
+
+def _bbox(ax, renderer, label):
+    text = {t.get_text(): t for t in ax.texts}[label]
+    return text.get_window_extent(renderer=renderer).transformed(ax.transAxes.inverted())
+
+
+def test_add_text_to_plot_luminosity_does_not_overlap_watermark_row_at_large_font_size():
+    """Regression test for the \\int glyph in the luminosity row growing tall
+    enough at large text_size to overlap the watermark row above it — this is
+    the root cause behind the reported "integral sign overlaps the watermark"
+    bug. Confirmed against the pre-fix code: gap was -0.236 (a large overlap)
+    at text_size=48 before this fix."""
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params(48)
+    plotter.luminosity_value = 408.0
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    watermark_bbox = _bbox(ax, renderer, plotter.watermark)
+    luminosity_bbox = _bbox(ax, renderer, plotter.luminosity)
+    assert watermark_bbox.y0 >= luminosity_bbox.y1
+    plt.close(fig)
+
+
+def test_add_text_to_plot_luminosity_spacing_holds_at_reduced_font_size():
+    """Regression check: the fix must not break spacing at the smaller font
+    size used by the bundled examples (examples/histogram_with_pull.py etc.)."""
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params(16)
+    plotter.luminosity_value = 408.0
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    watermark_bbox = _bbox(ax, renderer, plotter.watermark)
+    luminosity_bbox = _bbox(ax, renderer, plotter.luminosity)
+    assert watermark_bbox.y0 >= luminosity_bbox.y1
+    plt.close(fig)
+
+
+def test_add_text_to_plot_luminosity_does_not_overlap_watermark_through_real_plotter_pipeline():
+    """Integration regression: the unit-level tests above call `_add_text_to_plot`
+    directly against a bare `plt.subplots()` axes, so they never exercise the real
+    `HistogramPlotter.plot()` pipeline where `_add_axislabels`/`_add_legend` run
+    *after* `_add_text_to_plot` and `figure.autolayout` can still shrink the axes
+    box afterward (see the CLAUDE.md gotcha on layout-timing). Guards against a
+    future regression reintroducing the overlap once the real pipeline is involved."""
+    set_experiment("BelleII")
+
+    hist = Histogram()
+    hist.binning = np.linspace(-3, 3, 21)
+    hist.add_entry(HistogramEntry(name="signal", array=np.random.default_rng(0).normal(0, 1, 200)))
+    histplot = HistogramPlot(hist)
+
+    variable = HistogramVariable("x", "a.u.")
+    plotter = HistogramPlotter(histplot, variable)
+    plotter.set_matplotlibrc_params(36)
+    plotter.luminosity_value = 62.8
+    plotter.add_text("(Preliminary)")
+
+    ax, ax_diff = plotter.plot(save=False)
+    assert ax_diff is None
+
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    watermark_bbox = _bbox(ax, renderer, plotter.watermark)
+    luminosity_bbox = _bbox(ax, renderer, plotter.luminosity)
+    assert watermark_bbox.y0 >= luminosity_bbox.y1
+    plt.close(ax.figure)
+
+
+def test_add_text_to_plot_extra_text_rows_do_not_overlap_luminosity_at_large_font_size():
+    """add_text() rows must stack below the luminosity row without overlap
+    too — the fix applies to every row, not just the luminosity one."""
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params(48)
+    plotter.luminosity_value = 408.0
+    plotter.add_text("(Preliminary)")
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    luminosity_bbox = _bbox(ax, renderer, plotter.luminosity)
+    extra_bbox = _bbox(ax, renderer, "(Preliminary)")
+    assert luminosity_bbox.y0 >= extra_bbox.y1
+    plt.close(fig)
+
+
+def test_add_text_to_plot_multiple_extra_text_rows_stack_without_overlap():
+    """Two add_text() rows must not overlap each other either."""
+    set_experiment("BelleII")
+    plotter = ConcretePlotter()
+    plotter.set_matplotlibrc_params(48)
+    plotter.add_text("(Preliminary)")
+    plotter.add_text("Signal region")
+    fig, ax = plt.subplots()
+    plotter._add_text_to_plot(ax=ax)
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    first_bbox = _bbox(ax, renderer, "(Preliminary)")
+    second_bbox = _bbox(ax, renderer, "Signal region")
+    assert first_bbox.y0 >= second_bbox.y1
     plt.close(fig)
 
 
