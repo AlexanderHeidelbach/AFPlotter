@@ -42,7 +42,8 @@ def step1_convenience(data: dict[str, np.ndarray]) -> None:
     plot_histogram(
         entries=data,
         bins=(X_MIN, X_MAX, 41),
-        xlabel="$p_T$ [GeV]",
+        xlabel="$p_T$",
+        unit="GeV",
         stacked=False,
         save=os.path.join(OUTPUT_DIR, "01-histogram.png"),
     )
@@ -92,8 +93,11 @@ def _build_stacked_pull_plotter(data: dict[str, np.ndarray]) -> HistogramPlotter
     plotter.legend_ncol = 5
     plotter.legend_loc = "upper right"
 
+    # add_pull draws its own copy of this line on the main panel (to pick up
+    # `color` for the pull-panel markers); omit its label so the legend
+    # doesn't get "Model" twice.
     plotter.add_function(_model, binwidth=True, label="Model", color=PetroffColors.purple, lw=2)
-    plotter.add_pull(_model, binwidth=True, color=PetroffColors.purple, label="Model", lw=2, max_sigma=5.0)
+    plotter.add_pull(_model, binwidth=True, color=PetroffColors.purple, lw=2, max_sigma=5.0)
     return plotter
 
 
