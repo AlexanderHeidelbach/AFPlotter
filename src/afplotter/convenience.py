@@ -34,6 +34,7 @@ def plot_histogram(
     entries: dict[str, np.ndarray],
     bins: BinsSpec,
     xlabel: str = "",
+    unit: str = "",
     stacked: bool = False,
     save: PathType | None = None,
     **histogram_plotter_kwargs: Any,
@@ -43,7 +44,9 @@ def plot_histogram(
 
     :param entries: Mapping of entry name to its data array.
     :param bins: A bin-edges array/list, or a (start, stop, num) tuple.
-    :param xlabel: X-axis label.
+    :param xlabel: X-axis label (variable name).
+    :param unit: Optional unit for the variable, e.g. "GeV". Appended in
+        parentheses to the x-axis label and to the y-axis bin-width text.
     :param stacked: Whether entries are drawn stacked rather than as outlined steps.
     :param save: If given, the plot is saved to this path instead of shown.
     :param histogram_plotter_kwargs: Extra HistogramPlotter properties to set
@@ -58,7 +61,7 @@ def plot_histogram(
     histplot = HistogramPlot(hist)
     histplot.stacked = stacked
 
-    plotter = HistogramPlotter(histplot, HistogramVariable(xlabel))
+    plotter = HistogramPlotter(histplot, HistogramVariable(xlabel, unit))
     for key, value in histogram_plotter_kwargs.items():
         setattr(plotter, key, value)
 
