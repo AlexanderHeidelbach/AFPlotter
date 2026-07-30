@@ -172,7 +172,7 @@ class BasePlotter(ABC):
 
     @property
     def luminosity(self) -> str:
-        return f"∫ $L\\,\\mathrm{{d}}t\\;=\\;${self.luminosity_value:.0f}$\\;\\mathrm{{{self.luminosity_unit}}}^{{-1}}$"
+        return f"∫$L\\,\\mathrm{{d}}t\\;=\\;${self.luminosity_value:.0f}$\\;\\mathrm{{{self.luminosity_unit}}}^{{-1}}$"
 
     @property
     def legend_ncol(self) -> int:
