@@ -1,4 +1,7 @@
-# .github/workflows/update-workflow-images.yml
+# Relies on examples/workflow_demo.py being fully deterministic (seeded RNG, no
+# timestamps/wall-clock in the output) and on [skip ci] suppressing this workflow's
+# own re-trigger on its bot commit. If workflow_demo.py ever becomes
+# nondeterministic, this workflow can start committing on every run.
 name: Update workflow demo images
 
 on:
@@ -9,12 +12,19 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: update-workflow-images
+  cancel-in-progress: false
+
 jobs:
   update-images:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
