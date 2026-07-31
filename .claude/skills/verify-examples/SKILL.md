@@ -24,9 +24,11 @@ confirm each one produced real output.
    ```
    Confirm exit code 0. A traceback or non-zero exit is a failure — don't
    downgrade it to a warning.
-3. Confirm each run produced a new/updated file in `examples/output/` (PNG,
-   non-zero size). An example that exits 0 but writes nothing didn't actually
-   verify anything.
+3. Confirm each run produced a new/updated file, non-zero size. Every example
+   writes to `examples/output/` **except** `workflow_demo.py`, which writes to
+   `docs/img/workflow/` (its images are committed and embedded in the top-level
+   README, so they can't live in the gitignored `examples/output/`). An
+   example that exits 0 but writes nothing didn't actually verify anything.
 4. Flag drift: any `.py` file in `examples/` that is neither listed in
    `examples/README.md` nor a leading-underscore helper (`_*.py`) is stray —
    report it (empty file, forgotten script, or an example that needs adding to
@@ -37,7 +39,7 @@ confirm each one produced real output.
 | Check | Pass condition |
 |---|---|
 | Each documented example runs | exit code 0 |
-| Each documented example produces output | new/updated file in `examples/output/`, non-zero size |
+| Each documented example produces output | new/updated file in `examples/output/` (or `docs/img/workflow/` for `workflow_demo.py`), non-zero size |
 | No undocumented example-shaped files | every non-`_*.py` file in `examples/` is listed in `examples/README.md` |
 
 ## Common Mistakes
@@ -47,3 +49,5 @@ confirm each one produced real output.
 - Treating exit-0-with-no-output as a pass.
 - Globbing all `.py` files and reporting a false failure on `_synthetic_data.py`
   (it's a helper module, not an entry point — it has no `if __name__` block).
+- Checking `examples/output/` for `workflow_demo.py`'s output — it writes to
+  `docs/img/workflow/` instead, on purpose (see step 3).

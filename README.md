@@ -47,7 +47,8 @@ rng = np.random.default_rng(0)
 plot_histogram(
     entries={"signal": rng.normal(5, 1, 500), "background": rng.uniform(0, 10, 1000)},
     bins=(0, 10, 41),
-    xlabel="p_T (GeV)",
+    xlabel="p_T",
+    unit="GeV",
     stacked=True,
     save="pt.png",
 )
@@ -57,6 +58,35 @@ Colors come from the [Petroff 10](https://arxiv.org/abs/2107.02270) sequence by 
 with its red held out of the cycle and reserved for signal components. Switch to KIT or LMU
 colors (or register your own) with `set_palette(...)` — see
 [Histograms → Colours](docs/histograms.md#colours).
+
+## How you'd actually use this
+
+In practice you don't write the Quickstart snippet by hand — you install the
+[Claude Code skill](#claude-code-skill-optional) above and just ask for what you want, in plain
+English, across a few turns. Here's a real three-turn sequence, using the same synthetic
+signal/background sample throughout:
+
+> Plot signal vs background for pt
+
+![Unstacked signal/background overlay](docs/img/workflow/01-histogram.png)
+
+The convenience layer handles this in one call: `plot_histogram(entries, bins, stacked=False)`.
+
+> Now stack them and add a pull panel comparing to the model
+
+![Stacked histogram with model overlay and pull panel](docs/img/workflow/02-stacked-pull.png)
+
+A pull panel needs the full engine, not the convenience layer, so this escalates to
+`Histogram`/`HistogramEntry` → `HistogramPlot` → `HistogramPlotter`, with `add_function` and
+`add_pull` for the model overlay and pull panel, and pins signal to the reserved palette red.
+
+> Switch to KIT colors
+
+![Same plot, KIT color palette](docs/img/workflow/03-kit-colors.png)
+
+One line: `set_palette("KIT")`, called before the plot is rebuilt.
+
+See `examples/workflow_demo.py` for the full runnable script behind these three images.
 
 ## Docs
 
