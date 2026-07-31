@@ -67,7 +67,6 @@ def _build_stacked_pull_plotter(data: dict[str, np.ndarray]) -> HistogramPlotter
 
     hist = Histogram()
     hist.binning = np.linspace(X_MIN, X_MAX, 41)
-    hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], color=palette.signal))
     hist.add_entry(
         # background[1] (not [0]): amber for Petroff, blue for KIT -- both contrast
         # cleanly against the reserved signal red. background[0] is KIT's green,
@@ -76,6 +75,11 @@ def _build_stacked_pull_plotter(data: dict[str, np.ndarray]) -> HistogramPlotter
             name="background", latex_name="Background", array=data["background"], color=palette.background[1]
         )
     )
+    # type="signal" routes this into Histogram.signal instead of Histogram.entries, so
+    # plot_stacked() always closes the stack with it on top (at its true yield, in the
+    # palette's reserved signal red) regardless of add_entry() call order -- unlike a
+    # plain entry, whose stack position is just insertion order.
+    hist.add_entry(HistogramEntry(name="signal", latex_name="Signal", array=data["signal"], type="signal"))
 
     histplot = HistogramPlot(hist)
     histplot.stacked = True
