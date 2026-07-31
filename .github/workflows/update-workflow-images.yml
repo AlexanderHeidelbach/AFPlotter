@@ -1,0 +1,56 @@
+# .github/workflows/update-workflow-images.yml
+name: Update workflow demo images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Python 3.10
+        run: uv python install 3.10
+
+      - name: Install dependencies
+        run: uv sync --extra dev --python 3.10 --locked
+
+      - name: Regenerate workflow demo images
+        run: uv run python examples/workflow_demo.py
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git status --porcelain docs/img/workflow/ | grep -q .; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push regenerated images
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/img/workflow/
+          git commit -m "Auto-regenerate workflow demo images [skip ci]"
+          for attempt in 1 2; do
+            if git push; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 2 ]; then
+              echo "push failed after retry" >&2
+              exit 1
+            fi
+            git pull --rebase
+          done
