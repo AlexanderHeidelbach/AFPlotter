@@ -21,6 +21,13 @@ def test_plot_histogram_returns_axes_with_content(two_entry_arrays):
     plt.close(ax.figure)
 
 
+def test_plot_histogram_unit_appears_in_axis_labels(two_entry_arrays):
+    ax = plot_histogram(two_entry_arrays, bins=(0, 10, 21), xlabel="$p_T$", unit="GeV", save=False)
+    assert ax.get_xlabel() == "$p_T$ (GeV)"
+    assert "GeV" in ax.get_ylabel()
+    plt.close(ax.figure)
+
+
 def test_plot_histogram_saves_to_explicit_path(two_entry_arrays, tmp_path):
     save_path = tmp_path / "out.png"
     plot_histogram(two_entry_arrays, bins=(0, 10, 21), save=str(save_path))
