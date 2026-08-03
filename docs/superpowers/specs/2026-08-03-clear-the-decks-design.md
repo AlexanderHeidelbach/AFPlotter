@@ -7,7 +7,7 @@ each item below still gets its own spec and plan where one is needed.
 
 `main` is at `8632989` with CI green. The repo has ten open issues, one open pull request
 from an outside contributor, one in-flight feature branch carrying a spec and plan but no
-implementation, and nine remote branches of which most are dead.
+implementation, and ten remote branches of which most are dead.
 
 The goal for this stretch is to **finish what is already in flight before starting anything
 new**. No new feature work is scheduled here.
@@ -26,11 +26,12 @@ new**. No new feature work is scheduled here.
 The contributor is unknown to the maintainer and the repository was not expected to have
 outside traffic yet, so the diff was checked rather than taken on trust:
 
-- `uv.lock`: 13 changed lines, **all deletions**, touching only `importlib-resources` — its
+- `uv.lock`: 11 changed lines, **all deletions**, touching only `importlib-resources` — its
   two dependency back-references, its `source`, and its sdist/wheel URL+hash entries. No
   package added, no index or registry URL altered, no hash rewritten on any surviving
   package. This is exactly what `uv lock` emits after the dependency is dropped.
 - `pyproject.toml`: one line removed. `CLAUDE.md`: the matching follow-up bullet removed.
+  (13 changed lines across the whole commit: 11 + 1 + 1.)
 - Test-merged against `main` at `8632989`: clean, no conflict with PR #28's rewrite.
 - Account `kegodev` (Kegorapetse) was created 2026-06-20, 8 public repos, no followers.
   Neutral evidence, recorded for completeness.
@@ -81,11 +82,12 @@ additions from this session:
 **Step 4 — #26, the `legend_ncol` rename.** Full cycle: its own brainstorming session, then
 a plan, then implementation on top of merged #21.
 
-Ordering rationale: #21's "fix 3" rewrites `baseplotter.py:431` from a positional call into
-a kwargs splat, and #26 changes how `ncol` is computed. Landing #21 first means #26 edits a
-dict entry rather than untangling a positional call, and #26's design is written against
-code that already type-checks under mypy 2.3.0. The reverse order forces the larger,
-already-planned branch to rebase onto a moving API.
+Ordering rationale: #21's "fix 3" rewrites `baseplotter.py:431` — already a keyword call
+(`ncol=`, `title=`, `loc=`), only `lines, labels` stay positional — by collecting its keyword
+arguments into a dict and splatting them, and #26 changes how `ncol` is computed. Landing
+#21 first means #26 edits a dict entry rather than untangling a keyword call, and #26's
+design is written against code that already type-checks under mypy 2.3.0. The reverse order
+forces the larger, already-planned branch to rebase onto a moving API.
 
 ### Decisions already settled for #26
 
@@ -122,11 +124,19 @@ merged. It is the precursor to the experiment registry and the only copy of an I
 experiment (`src/afplotter/experiments/i3.py`, `icecube.mplstyle`). Deleting it makes those
 commits unreachable — real loss, unlike the seven above.
 
-Plan: tag before removing.
+Plan: tag before removing. Use an annotated tag carrying provenance (branch name, commit
+count, date, what it is the sole copy of), push it, and gate the deletion on a hard
+`git ls-remote` check — if the tag doesn't show up remotely, stop and do not delete.
 
 ```bash
-git tag archive/PackageSetup origin/PackageSetup
+git tag -a archive/PackageSetup origin/PackageSetup \
+  -m "Archived unmerged PackageSetup branch (7 commits, 2026-01-29).
+
+Precursor to the experiment registry. Sole copy of the IceCube experiment
+(src/afplotter/experiments/i3.py, icecube.mplstyle) -- see #<ICEISSUE>."
 git push origin archive/PackageSetup
+git ls-remote --tags origin archive/PackageSetup
+# If it prints nothing, stop -- do not proceed to the delete below.
 git push origin --delete PackageSetup
 ```
 
