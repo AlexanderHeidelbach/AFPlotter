@@ -65,9 +65,20 @@ uv run python examples/histogram_with_pull.py            # examples are run, not
 ```
 
 `pre-commit run --all-files` runs ruff (lint + format) and mypy; CI runs the same three
-checks, pinned to the same versions, alongside the test suite. Keep the two files in sync
-— a version bump in `pyproject.toml`'s `dev` extra needs the matching `rev:` bump in
-`.pre-commit-config.yaml`.
+checks, pinned to the same versions. Keep the two files in sync — a version bump in
+`pyproject.toml`'s `dev` extra needs the matching `rev:` bump in `.pre-commit-config.yaml`.
+
+Matching versions does not mean matching results, though. Pre-commit's mypy hook runs
+in an isolated environment with no project dependencies installed, and `--ignore-missing-imports`
+silently papers over that — types coming from numpy/matplotlib/polars resolve to `Any`
+instead of their real stubs, so the hook can pass on code that CI's mypy fails. (Verified:
+a bare `mypy==2.3.0` venv with no project deps reports `Success` on code this repo's CI
+correctly flags.) Only CI's `uv run mypy`, run inside the fully-synced project venv, is a
+reliable type-check gate — treat a local pre-commit pass as lint+format assurance, not
+type-check assurance. Do not "fix" this by adding `additional_dependencies` to the
+pre-commit hook: those would resolve independently of `uv.lock`, so the hook could then
+report errors CI does not — reintroducing the local/CI divergence the version pins above
+exist to prevent.
 
 CI installs with `uv sync --locked`, so a dependency change in `pyproject.toml` without a
 regenerated committed `uv.lock` fails CI before a single test runs.
@@ -127,9 +138,6 @@ limits) chain `add_generic_plot(...)` / `add_generic_text(...)` / `add_inset(...
 
 - **Python 3.10+ typing**: native `X | Y` unions and builtin generics (`list[X]`, `dict[K, V]`,
   `tuple[X, Y]`) — no `typing.Optional`/`List`/`Dict`/`Tuple`/`Union` imports.
-- A local green run doesn't guarantee CI will match, and a local red mypy doesn't mean the
-  branch is broken — the interpreter and resolved dependency set differ. See Setup above;
-  check the CI run itself for anything version-sensitive.
 - **reST docstrings** (`:param:` / `:return:`) on public functions and classes.
 - **No import-time side effects** that touch the filesystem or env vars. `import afplotter` must
   succeed in a bare environment — `tests/test_packaging.py` guards this as a regression test.
