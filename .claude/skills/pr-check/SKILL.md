@@ -7,10 +7,13 @@ description: Use when finishing a branch or preparing to open/update a PR in thi
 
 ## Overview
 
-This repo carries pre-existing lint/mypy debt on `main` (see `CLAUDE.md`), so a
-raw `ruff check` or `mypy` run reports a nonzero count on a clean branch too.
-The question that matters is never "how many errors are there" — it's
-"did this branch add any." Answer that by diffing against the base branch,
+A raw local `mypy` run reports a nonzero count on a clean `main` too — not
+because of pre-existing debt, but because the local interpreter resolves a
+newer dependency set than CI's pinned 3.10, and the pinned `mypy==1.10.1`
+cannot resolve numpy 2.5's stubs (see `CLAUDE.md`'s Setup section). Most of
+those errors are false positives that CI never sees. The question that matters
+is therefore never "how many errors are there" — it's "did this branch add
+any." Answer that by diffing against the base branch, on the same interpreter,
 never by mutating the repo.
 
 **Never run `pre-commit run --all-files`, bare `ruff format` (no `--check`), or
@@ -33,9 +36,10 @@ untouched files it reformatted, not committing the reformat.
    Compare HEAD's output against the same commands run at the branch's
    merge-base (`git merge-base main HEAD`, checked out in a worktree or
    `git stash`/`git worktree add` — never by resetting the current tree).
-   Report: any error/file newly present at HEAD that wasn't at the base is a
-   regression to fix; everything else is pre-existing debt, not this branch's
-   problem.
+   Both runs must use the same interpreter and dependency set, or the diff is
+   meaningless. Report: any error/file newly present at HEAD that wasn't at the
+   base is a regression to fix; everything else is toolchain noise or
+   pre-existing, not this branch's problem.
 3. **Examples**: run the verify-examples check (**REQUIRED SUB-SKILL:** use
    `verify-examples`) — this repo's examples are gitignored-output scripts
    that must actually execute, not just import cleanly.
@@ -55,7 +59,8 @@ untouched files it reformatted, not committing the reformat.
 ## Common Mistakes
 
 - Reporting raw `ruff`/`mypy` error counts as if they mean something on their
-  own — this repo's counts are nonzero on a clean `main`. Always diff against base.
+  own — local `mypy` is nonzero on a clean `main` for toolchain reasons, while
+  CI is green. Always diff against base.
 - Running a repo-wide autofix/reformat as a "check" and leaving the tree dirty.
 - Skipping the examples check because tests passed — tests don't execute
   `examples/`, and it's a separate, real gate `CLAUDE.md` calls out.

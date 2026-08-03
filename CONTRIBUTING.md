@@ -36,6 +36,15 @@ uv run pytest tests/ -v
 `pre-commit install` sets up ruff (lint + format) and mypy locally — run
 `pre-commit run --all-files` before opening a PR.
 
+If you're using Claude Code, run `/init` at the start of a fresh session. It
+won't overwrite `CLAUDE.md`; it re-derives the guide from the code and reports
+where the two have drifted apart. Since `CLAUDE.md` is this project's source of
+truth and nothing checks it against the code automatically, that report is worth
+acting on — see `CLAUDE.md`'s "Run `/init` when starting fresh".
+
+Note that a raw local `mypy` run is red even on a clean checkout — that's a
+toolchain mismatch, not your branch. `CLAUDE.md`'s Setup section explains it.
+
 ## Before opening a PR
 
 - Full test suite passes: `uv run pytest tests/ -v`.
