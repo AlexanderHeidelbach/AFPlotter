@@ -7,6 +7,42 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      # Do not cancel a sibling leg on first failure: the two legs exist to be
+      # compared. uv.lock's resolution-markers mean 3.10 and 3.14 resolve
+      # different matplotlib/numpy versions, and knowing whether a failure hits
+      # one leg or both is the difference between "version-specific" and "real bug".
+      fail-fast: false
+      matrix:
+        # 3.14 is the deliberate upper endpoint, pinned rather than floating so
+        # CI cannot turn red from an upstream release nobody here made.
+        # Bump it when 3.15 ships.
+        python: ["3.10", "3.14"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Python ${{ matrix.python }}
+        run: uv python install ${{ matrix.python }}
+
+      - name: Install dependencies
+        run: uv sync --extra dev --python ${{ matrix.python }} --locked
+
+      - name: Run tests
+        run: uv run pytest tests/ -v
+
+      - name: Type check (mypy)
+        run: uv run mypy --namespace-packages --explicit-package-bases --ignore-missing-imports src/
+
+  lint:
+    runs-on: ubuntu-latest
+    # ruff is a pinned standalone binary with no target-version override, so it
+    # infers its target from requires-python and produces identical results on
+    # every interpreter. Matrixing it would double the cost and report one
+    # formatting slip as two failures.
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -20,14 +56,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev --python 3.10 --locked
 
-      - name: Run tests
-        run: uv run pytest tests/ -v
-
       - name: Lint (ruff check)
         run: uv run ruff check .
 
       - name: Format check (ruff format)
         run: uv run ruff format --check .
-
-      - name: Type check (mypy)
-        run: uv run mypy --namespace-packages --explicit-package-bases --ignore-missing-imports src/
