@@ -428,4 +428,9 @@ class BasePlotter(ABC):
 
         if labels:
             ncol = len(labels) // self.legend_ncol + (1 if len(labels) % self.legend_ncol != 0 else 0)
-            ax[0].legend(lines, labels, ncol=ncol, title=self.legend_title, loc=self.legend_loc)
+            legend_kwargs: dict[str, Any] = {
+                "ncol": ncol,
+                "title": self.legend_title,
+                "loc": self.legend_loc,
+            }
+            ax[0].legend(lines, labels, **legend_kwargs)
