@@ -194,9 +194,9 @@ imported, not run. The `verify-examples` skill automates this.
 
 ## Status
 
-116 tests → **137** as of the palette/watermark/workflow-demo work → **138** on
-`feature/ci-python-version-matrix`; suite is green, `ruff check` is clean, and CI (Python
-3.10) is green on `main`.
+Suite is green, `ruff check` is clean, and CI is green on `main`. (Don't record a test count
+here — it goes stale on the next commit and nothing checks it. Run `uv run pytest tests/ -q`
+for the current number.)
 
 Done on `feature/ci-python-version-matrix` (issue #21): CI previously exercised only Python
 3.10, so the newer dependency set a current interpreter resolves had never been tested. The
