@@ -675,3 +675,41 @@ Do not do any of these, even if tempting while in the files:
 - **Bumping `ruff`** — already clean on both dependency sets.
 - **The unused `importlib_resources` dependency** — that is #23, and touching `pyproject.toml` here does not make it in scope.
 - **Adding 3.11/3.12/3.13 to the matrix** — endpoints were chosen deliberately; see the spec.
+
+## Outcome
+
+Executed 2026-08-03 via `superpowers:subagent-driven-development`, one implementer plus an
+independent reviewer per task. Recorded here because the SDD ledger is git-ignored and would
+otherwise leave no committed evidence the plan ran.
+
+| Task | Commit | Result |
+|---|---|---|
+| 1 — `binning` setter | `2160ae4` | Widened to `np.ndarray \| int \| None`; suite 137 → 138 |
+| 2 — `GenericPlot.plot()` | `eb4c494` | `ax` bound to a local; `self.ax` side effect preserved |
+| 3 — legend kwargs | `f5630d5` | `dict[str, Any]` splat; first point both dep sets are mypy-clean |
+| 4 — mypy pin | `540a336` | `2.3.0` in `pyproject.toml` + `.pre-commit-config.yaml`; `.python-version`; `uv.lock` regenerated (dev-side only) |
+| 6 — `CLAUDE.md` (added) | `035a73f` | Guide updated for the new toolchain; not in the original plan, required by the clear-the-decks spec |
+| 5 — CI matrix | `527db7a`, `f709d75` | Matrixed `test` + single `lint`; **initially failed** — see below |
+
+**Task 5 failed on first attempt, and the cause was a defect in this plan.** Task 4's
+`.python-version` (3.10) and Task 5's verbatim workflow interact: the bare `uv run pytest` /
+`uv run mypy` steps carry no `--python`, so on the 3.14 leg `uv` honoured `.python-version`,
+discarded the environment the sync step had just built, rebuilt `.venv` for 3.10 *without*
+`--extra dev`, and died with `Failed to spawn: pytest`. Neither task could see this alone.
+Fixed in `f709d75` with a job-level `env: UV_PYTHON: ${{ matrix.python }}`.
+
+**Final review** (`be2ef1c..f709d75`) approved the branch and raised four items, all fixed in
+`73dff7e`, `b1a8ee6`, `5aa4e68`:
+
+- The `lint` job lacked `UV_PYTHON` and survived only because `.python-version` happened to
+  match its hardcoded `--python 3.10` — latent form of the same failure.
+- `CLAUDE.md` overclaimed that pre-commit and CI agree. The mirrors-mypy hook runs with no
+  project dependencies, so numpy/matplotlib types resolve to `Any`; it could not have caught
+  any of the three defects this branch fixed. `additional_dependencies` was considered and
+  rejected — those deps would resolve independently of `uv.lock` and reintroduce the
+  local-vs-CI divergence this branch removed.
+- A stale Conventions bullet still claimed local mypy is expected to be red.
+- Nothing pinned the `self.ax` side effect; a falsifiable identity test now does.
+
+**Final state:** HEAD `5aa4e68`, 139 tests, mypy `Success` and `uv sync --locked` verified on
+both 3.10 and 3.14, CI run `30854245424` green on `test (3.10)`, `test (3.14)`, and `lint`.
