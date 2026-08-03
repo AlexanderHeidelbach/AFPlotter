@@ -48,6 +48,10 @@ jobs:
     # infers its target from requires-python and produces identical results on
     # every interpreter. Matrixing it would double the cost and report one
     # formatting slip as two failures.
+    env:
+      # Pin explicitly rather than relying on .python-version happening to match
+      # the --python below; see the test job for the failure this prevents.
+      UV_PYTHON: "3.10"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
