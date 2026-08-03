@@ -31,16 +31,56 @@ Concrete precedent: the `palettes.py`/`set_palette` work (PR #10) and the `pr-ch
 `verify-examples` skills (PR #12) were both built this way — see their commit history and
 `docs/superpowers/{specs,plans}/` for the artifacts this pipeline produces.
 
+Both artifacts are named `YYYY-MM-DD-<slug>.md`, with the plan reusing its spec's slug
+(`2026-07-29-palette-switching-design.md` → `2026-07-29-palette-switching.md`).
+
+### Run `/init` when starting fresh
+
+At the start of a new session in this repo — before substantive work — run Claude Code's
+`/init`. On a repo that already has a `CLAUDE.md` it doesn't overwrite anything; it
+re-derives the guide from the code and reports where the two have diverged.
+
+This matters more here than in most repos. This file is the single source of truth for
+architecture, conventions, and testing philosophy, it is written largely by agents, and
+nothing mechanically checks it against the code. It drifts silently: a `/init` pass found
+a stale test count, a Status section describing a branch merged long ago, a documented
+CI guarantee that was the *opposite* of what a contributor observes locally, and a
+`.claude/skills/` skill justifying itself with technical debt that no longer existed.
+None of that is visible from reading the code, and none of it fails a test.
+
+Treat what `/init` reports as a finding to act on, not a formality — fixing drift is a
+doc-only correction and falls under the exception above.
+
 ## Setup
 
 ```bash
 uv sync --extra dev
-uv run pytest tests/ -v   # full suite
+
+uv run pytest tests/ -v                                  # full suite
+uv run pytest tests/test_histogramplot.py -v             # one file
+uv run pytest tests/test_baseplotter.py::test_default_properties -v   # one test
+uv run pytest -k "palette" -v                            # by name substring
+
+uv run python examples/histogram_with_pull.py            # examples are run, not inspected
 ```
 
-`pre-commit run --all-files` runs ruff (lint + format) and mypy. CI now runs the same
-three checks (pinned to the same versions as pre-commit) alongside the test suite, so a
-skipped `pre-commit install` no longer lets lint/type regressions through unnoticed.
+`pre-commit run --all-files` runs ruff (lint + format) and mypy; CI runs the same three
+checks, pinned to the same versions, alongside the test suite. Keep the two files in sync
+— a version bump in `pyproject.toml`'s `dev` extra needs the matching `rev:` bump in
+`.pre-commit-config.yaml`.
+
+CI installs with `uv sync --locked`, so a dependency change in `pyproject.toml` without a
+regenerated committed `uv.lock` fails CI before a single test runs.
+
+**Expect local mypy to be red even on a clean tree.** CI pins `--python 3.10`; a local
+`uv sync` picks whatever interpreter satisfies `>=3.10`, and because `uv.lock` carries
+resolution markers, a newer interpreter legitimately resolves *newer* matplotlib/numpy.
+The pinned `mypy==1.10.1` (June 2024) predates numpy 2.5's stubs and cannot resolve them,
+so it reports ~11 errors — mostly `_HistogramResult?`/`NDArray?` false positives, where
+the `?` is mypy's own unresolved-type marker — while CI stays green on the 3.10 set.
+`ruff` is unaffected (pinned standalone binary, identical on both sets), and pytest passes
+on both. Diff against the merge-base rather than reading raw counts; the `pr-check` skill
+does this. A fix is in flight — see Status below.
 
 ## Architecture
 
@@ -88,8 +128,8 @@ limits) chain `add_generic_plot(...)` / `add_generic_text(...)` / `add_inset(...
 
 - **Python 3.10+ typing**: native `X | Y` unions and builtin generics (`list[X]`, `dict[K, V]`,
   `tuple[X, Y]`) — no `typing.Optional`/`List`/`Dict`/`Tuple`/`Union` imports.
-- Local `uv sync` picks whatever interpreter satisfies `>=3.10` (may be newer than 3.10); CI
-  pins exactly 3.10 via `--python 3.10`. A local green run doesn't guarantee CI will match —
+- A local green run doesn't guarantee CI will match, and a local red mypy doesn't mean the
+  branch is broken — the interpreter and resolved dependency set differ. See Setup above;
   check the CI run itself for anything version-sensitive.
 - **reST docstrings** (`:param:` / `:return:`) on public functions and classes.
 - **No import-time side effects** that touch the filesystem or env vars. `import afplotter` must
@@ -115,6 +155,14 @@ These bit us during development and are easy to repeat:
   See `docs/selections.md` for the supported grammar and current null/NaN semantics.
 - **`figure.autolayout` conflicts with `mpl_toolkits` insets**, producing a `tight_layout`
   warning on save. Harmless but noisy.
+- **`examples/workflow_demo.py` must stay deterministic, or `main` starts committing to itself.**
+  `.github/workflows/update-workflow-images.yml` runs it on every push to `main` and commits
+  any diff under `docs/img/workflow/` back to the branch. It stays quiet only because the
+  script is fully reproducible (seeded RNG, no wall-clock, no timestamps) and because
+  `[skip ci]` on the bot commit suppresses the re-trigger. Anything that makes its rendered
+  output vary run-to-run — in the script itself or in the plotting code it exercises — turns
+  that into a bot commit on every push. It is also the only example whose PNGs are committed
+  (the README embeds them); the rest write to gitignored `examples/output/`.
 - **Text-block rows are positioned from bboxes measured before layout settles.** `_add_text_to_plot` measures
   and positions the watermark/luminosity/`add_text()` rows before `_add_axislabels`/`_add_legend` run, and
   `figure.autolayout` can still shrink the axes box afterward — at very large `text_size` on a small `figsize`
@@ -132,13 +180,23 @@ on rendered data (`ax.lines[0].get_ydata()`), artist counts by type (`ax.contain
 `errorbar`, `ax.patches` for `hist`), or computed values.
 
 Examples in `examples/` are verified by **running them**, not by inspection — they must exit 0
-and write a PNG to `examples/output/` (gitignored).
+and write a PNG to `examples/output/` (gitignored; `workflow_demo.py` is the exception, see
+Gotchas). `examples/README.md`'s bullet list is the source of truth for which files are
+runnable examples — the directory also holds helpers like `_synthetic_data.py` that are
+imported, not run. The `verify-examples` skill automates this.
 
 ## Status
 
-Standalone-packaging work is complete on `feature/standalone-package-and-skill`: the import-time
-crash is fixed, all previously-empty test files have real coverage (116 tests), and README/docs/
-examples/skill are in place.
+116 tests → **137** as of the palette/watermark/workflow-demo work; suite is green, `ruff check`
+is clean, and CI (Python 3.10) is green on `main`.
+
+In flight on `feature/ci-python-version-matrix` (issue #21): CI currently exercises only Python
+3.10, so the newer dependency set a current interpreter resolves has never been tested. The design
+(`docs/superpowers/specs/2026-08-03-ci-python-version-matrix-design.md`, on that branch) adds a
+3.10/3.14 matrix,
+bumps `mypy` 1.10.1 → 2.3.0, pins `.python-version` to 3.10, and fixes three real type defects —
+two of which are latent on *both* dependency sets and invisible only because the pinned mypy is
+too old to see them.
 
 Open follow-ups:
 
