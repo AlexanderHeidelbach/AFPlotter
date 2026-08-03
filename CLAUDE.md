@@ -27,9 +27,8 @@ fix already fully specified by whoever asked for it) can be made directly — do
 full pipeline for those. When in doubt, use it; the pipeline overhead on a small task is much
 cheaper than an unreviewed regression.
 
-Concrete precedent: the `palettes.py`/`set_palette` work (PR #10) and the `pr-check` /
-`verify-examples` skills (PR #12) were both built this way — see their commit history and
-`docs/superpowers/{specs,plans}/` for the artifacts this pipeline produces.
+See `docs/superpowers/{specs,plans}/` for the artifacts this pipeline produces — read a
+matching spec/plan pair before writing your own.
 
 Both artifacts are named `YYYY-MM-DD-<slug>.md`, with the plan reusing its spec's slug
 (`2026-07-29-palette-switching-design.md` → `2026-07-29-palette-switching.md`).
@@ -42,11 +41,11 @@ re-derives the guide from the code and reports where the two have diverged.
 
 This matters more here than in most repos. This file is the single source of truth for
 architecture, conventions, and testing philosophy, it is written largely by agents, and
-nothing mechanically checks it against the code. It drifts silently: a `/init` pass found
-a stale test count, a Status section describing a branch merged long ago, a documented
-CI guarantee that was the *opposite* of what a contributor observes locally, and a
-`.claude/skills/` skill justifying itself with technical debt that no longer existed.
-None of that is visible from reading the code, and none of it fails a test.
+nothing mechanically checks it against the code. It drifts silently, and the usual failures
+are invisible from reading the code and fail no test: stale counts, a Status section
+describing work that has already landed, a documented CI guarantee that is the *opposite*
+of what a contributor observes locally, a skill justifying itself with debt that no longer
+exists.
 
 Treat what `/init` reports as a finding to act on, not a formality — fixing drift is a
 doc-only correction and falls under the exception above.
@@ -86,11 +85,10 @@ regenerated committed `uv.lock` fails CI before a single test runs.
 **mypy is pinned at `2.3.0`**, which reads current numpy stubs correctly, so a clean tree
 is green locally as well as in CI. `.python-version` pins local development to `3.10`, so
 a fresh clone matches CI's baseline leg deterministically instead of `uv sync` picking
-whatever interpreter happens to satisfy `>=3.10`. CI itself now tests both `3.10` and
-`3.14`: because `uv.lock` carries resolution markers, a newer interpreter legitimately
-resolves *newer* matplotlib/numpy — a dependency set CI previously never exercised. Local
-and CI can still diverge for other reasons, so check the CI run itself for anything
-version-sensitive.
+whatever interpreter happens to satisfy `>=3.10`. CI tests both `3.10` and `3.14`: because
+`uv.lock` carries resolution markers, a newer interpreter legitimately resolves *newer*
+matplotlib/numpy, so the two legs exercise different dependency sets. Local and CI can still
+diverge for other reasons, so check the CI run itself for anything version-sensitive.
 
 ## Architecture
 
@@ -194,17 +192,11 @@ imported, not run. The `verify-examples` skill automates this.
 
 ## Status
 
-Suite is green, `ruff check` is clean, and CI is green on `main`. (Don't record a test count
-here — it goes stale on the next commit and nothing checks it. Run `uv run pytest tests/ -q`
-for the current number.)
+Suite is green, `ruff check` is clean, and CI is green on `main`.
 
-Done on `feature/ci-python-version-matrix` (issue #21): CI previously exercised only Python
-3.10, so the newer dependency set a current interpreter resolves had never been tested. The
-branch (design at `docs/superpowers/specs/2026-08-03-ci-python-version-matrix-design.md`)
-adds a 3.10/3.14 matrix, bumps `mypy` 1.10.1 → 2.3.0 (see Setup above), pins
-`.python-version` to 3.10, and fixes three real type defects that the old mypy pin was too
-old to see — two of which were latent on *both* dependency sets. Suite and mypy are green
-on both Python versions.
+Keep this section to *current* state and open work only — no test counts, no branch names, no
+recaps of what landed. Those go stale the moment they're written and nothing checks them; git
+log, closed issues, and `docs/superpowers/` already hold the history.
 
 Open follow-ups:
 
