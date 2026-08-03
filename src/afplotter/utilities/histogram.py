@@ -124,7 +124,7 @@ class Histogram:
         return self._binning
 
     @binning.setter
-    def binning(self, bins: np.ndarray | int) -> None:
+    def binning(self, bins: np.ndarray | int | None) -> None:
         self._binning = bins
 
     @property
