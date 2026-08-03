@@ -158,3 +158,20 @@ def test_histogram_order_entries_wrong_count_raises():
     hist.add_entry(HistogramEntry(name="a", array=np.array([0.5])))
     with pytest.raises(ValueError):
         hist.order_entries(["a", "b"])
+
+
+def test_histogram_roundtrip_preserves_unset_binning():
+    """A Histogram with no binning must survive as_dict -> from_dict with binning still None.
+
+    Guards the binning=None path through as_dict/from_dict, which had zero coverage: a
+    Histogram with unset binning must round-trip to unset binning, not be coerced into an
+    array or an int.
+    """
+    hist = Histogram()
+    data = hist.as_dict
+    assert data["binning"] is None
+
+    restored = Histogram.from_dict(data)
+    assert restored.binning is None
+    assert restored.entries == {}
+    assert restored.signal == {}

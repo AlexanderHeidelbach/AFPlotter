@@ -11,6 +11,18 @@ def test_generic_plot_creates_own_axes_if_none_given():
     plt.close(ax.figure)
 
 
+def test_generic_plot_self_ax_matches_returned_axes_when_created_internally():
+    # `plot()` binds a local `ax` and separately assigns `self.ax = ax` when it
+    # creates its own axes. That assignment reads as redundant next to the local
+    # and is easy for a future simplifier to delete unnoticed. GenericPlot is
+    # public API and callers may legitimately read `.ax` after calling `plot()`,
+    # so pin the identity relationship, not just non-None-ness.
+    gp = GenericPlot("plot", [0, 1], [0, 1])
+    ax = gp.plot()
+    assert gp.ax is ax
+    plt.close(ax.figure)
+
+
 def test_generic_plot_uses_provided_axes():
     fig, ax = plt.subplots()
     gp = GenericPlot("scatter", [0, 1, 2], [2, 1, 0], color="red")

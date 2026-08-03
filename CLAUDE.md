@@ -65,22 +65,32 @@ uv run python examples/histogram_with_pull.py            # examples are run, not
 ```
 
 `pre-commit run --all-files` runs ruff (lint + format) and mypy; CI runs the same three
-checks, pinned to the same versions, alongside the test suite. Keep the two files in sync
-— a version bump in `pyproject.toml`'s `dev` extra needs the matching `rev:` bump in
-`.pre-commit-config.yaml`.
+checks, pinned to the same versions. Keep the two files in sync — a version bump in
+`pyproject.toml`'s `dev` extra needs the matching `rev:` bump in `.pre-commit-config.yaml`.
+
+Matching versions does not mean matching results, though. Pre-commit's mypy hook runs
+in an isolated environment with no project dependencies installed, and `--ignore-missing-imports`
+silently papers over that — types coming from numpy/matplotlib/polars resolve to `Any`
+instead of their real stubs, so the hook can pass on code that CI's mypy fails. (Verified:
+a bare `mypy==2.3.0` venv with no project deps reports `Success` on code this repo's CI
+correctly flags.) Only CI's `uv run mypy`, run inside the fully-synced project venv, is a
+reliable type-check gate — treat a local pre-commit pass as lint+format assurance, not
+type-check assurance. Do not "fix" this by adding `additional_dependencies` to the
+pre-commit hook: those would resolve independently of `uv.lock`, so the hook could then
+report errors CI does not — reintroducing the local/CI divergence the version pins above
+exist to prevent.
 
 CI installs with `uv sync --locked`, so a dependency change in `pyproject.toml` without a
 regenerated committed `uv.lock` fails CI before a single test runs.
 
-**Expect local mypy to be red even on a clean tree.** CI pins `--python 3.10`; a local
-`uv sync` picks whatever interpreter satisfies `>=3.10`, and because `uv.lock` carries
-resolution markers, a newer interpreter legitimately resolves *newer* matplotlib/numpy.
-The pinned `mypy==1.10.1` (June 2024) predates numpy 2.5's stubs and cannot resolve them,
-so it reports ~11 errors — mostly `_HistogramResult?`/`NDArray?` false positives, where
-the `?` is mypy's own unresolved-type marker — while CI stays green on the 3.10 set.
-`ruff` is unaffected (pinned standalone binary, identical on both sets), and pytest passes
-on both. Diff against the merge-base rather than reading raw counts; the `pr-check` skill
-does this. A fix is in flight — see Status below.
+**mypy is pinned at `2.3.0`**, which reads current numpy stubs correctly, so a clean tree
+is green locally as well as in CI. `.python-version` pins local development to `3.10`, so
+a fresh clone matches CI's baseline leg deterministically instead of `uv sync` picking
+whatever interpreter happens to satisfy `>=3.10`. CI itself now tests both `3.10` and
+`3.14`: because `uv.lock` carries resolution markers, a newer interpreter legitimately
+resolves *newer* matplotlib/numpy — a dependency set CI previously never exercised. Local
+and CI can still diverge for other reasons, so check the CI run itself for anything
+version-sensitive.
 
 ## Architecture
 
@@ -128,9 +138,6 @@ limits) chain `add_generic_plot(...)` / `add_generic_text(...)` / `add_inset(...
 
 - **Python 3.10+ typing**: native `X | Y` unions and builtin generics (`list[X]`, `dict[K, V]`,
   `tuple[X, Y]`) — no `typing.Optional`/`List`/`Dict`/`Tuple`/`Union` imports.
-- A local green run doesn't guarantee CI will match, and a local red mypy doesn't mean the
-  branch is broken — the interpreter and resolved dependency set differ. See Setup above;
-  check the CI run itself for anything version-sensitive.
 - **reST docstrings** (`:param:` / `:return:`) on public functions and classes.
 - **No import-time side effects** that touch the filesystem or env vars. `import afplotter` must
   succeed in a bare environment — `tests/test_packaging.py` guards this as a regression test.
@@ -187,16 +194,17 @@ imported, not run. The `verify-examples` skill automates this.
 
 ## Status
 
-116 tests → **137** as of the palette/watermark/workflow-demo work; suite is green, `ruff check`
-is clean, and CI (Python 3.10) is green on `main`.
+Suite is green, `ruff check` is clean, and CI is green on `main`. (Don't record a test count
+here — it goes stale on the next commit and nothing checks it. Run `uv run pytest tests/ -q`
+for the current number.)
 
-In flight on `feature/ci-python-version-matrix` (issue #21): CI currently exercises only Python
-3.10, so the newer dependency set a current interpreter resolves has never been tested. The design
-(`docs/superpowers/specs/2026-08-03-ci-python-version-matrix-design.md`, on that branch) adds a
-3.10/3.14 matrix,
-bumps `mypy` 1.10.1 → 2.3.0, pins `.python-version` to 3.10, and fixes three real type defects —
-two of which are latent on *both* dependency sets and invisible only because the pinned mypy is
-too old to see them.
+Done on `feature/ci-python-version-matrix` (issue #21): CI previously exercised only Python
+3.10, so the newer dependency set a current interpreter resolves had never been tested. The
+branch (design at `docs/superpowers/specs/2026-08-03-ci-python-version-matrix-design.md`)
+adds a 3.10/3.14 matrix, bumps `mypy` 1.10.1 → 2.3.0 (see Setup above), pins
+`.python-version` to 3.10, and fixes three real type defects that the old mypy pin was too
+old to see — two of which were latent on *both* dependency sets. Suite and mypy are green
+on both Python versions.
 
 Open follow-ups:
 
