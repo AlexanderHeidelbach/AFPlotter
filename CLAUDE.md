@@ -34,6 +34,23 @@ Concrete precedent: the `palettes.py`/`set_palette` work (PR #10) and the `pr-ch
 Both artifacts are named `YYYY-MM-DD-<slug>.md`, with the plan reusing its spec's slug
 (`2026-07-29-palette-switching-design.md` → `2026-07-29-palette-switching.md`).
 
+### Run `/init` when starting fresh
+
+At the start of a new session in this repo — before substantive work — run Claude Code's
+`/init`. On a repo that already has a `CLAUDE.md` it doesn't overwrite anything; it
+re-derives the guide from the code and reports where the two have diverged.
+
+This matters more here than in most repos. This file is the single source of truth for
+architecture, conventions, and testing philosophy, it is written largely by agents, and
+nothing mechanically checks it against the code. It drifts silently: a `/init` pass found
+a stale test count, a Status section describing a branch merged long ago, a documented
+CI guarantee that was the *opposite* of what a contributor observes locally, and a
+`.claude/skills/` skill justifying itself with technical debt that no longer existed.
+None of that is visible from reading the code, and none of it fails a test.
+
+Treat what `/init` reports as a finding to act on, not a formality — fixing drift is a
+doc-only correction and falls under the exception above.
+
 ## Setup
 
 ```bash
