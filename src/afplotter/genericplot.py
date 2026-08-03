@@ -22,12 +22,14 @@ class GenericPlot:
         self._ax = ax
 
     def plot(self) -> plt.Axes:
-        if self.ax is None:
-            self.ax = plt.subplots()[1]
-        plotmethod = getattr(self.ax, self.plotmethod)
+        ax = self.ax
+        if ax is None:
+            ax = plt.subplots()[1]
+            self.ax = ax
+        plotmethod = getattr(ax, self.plotmethod)
         plotmethod(*self.args, **self.kwargs)
 
-        return self.ax
+        return ax
 
 
 class InsetPlot:
