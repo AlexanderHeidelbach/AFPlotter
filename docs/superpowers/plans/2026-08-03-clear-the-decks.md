@@ -27,7 +27,7 @@ Copied from `docs/superpowers/specs/2026-08-03-clear-the-decks-design.md`:
 
 ### Task 1: Merge PR #27
 
-Closes #23. The diff was already audited in the spec (`uv.lock`: 13 lines, all deletions, only `importlib-resources`); no further code review is required.
+Closes #23. The diff was already audited in the spec (`uv.lock`: 11 lines, all deletions, only `importlib-resources`); no further code review is required.
 
 **Files:**
 - No local files. GitHub state only.
@@ -86,7 +86,7 @@ Expected: both `CI` and `Update workflow demo images` report `success`, and `mai
 
 ### Task 2: File the IceCube registry-example issue
 
-Must happen **before** Task 3 deletes the branch, so the issue can reference it while it still exists.
+Must happen **before** Task 3, because Task 3's annotated tag message cites the issue number — the issue has to exist first so the tag can reference it. (The tag itself, not the branch, is what the issue's recovery commands point at; nothing requires the branch to stay alive.)
 
 **Files:**
 - No local files. GitHub state only.
@@ -112,7 +112,7 @@ gh issue create \
   --label documentation \
   --body 'CLAUDE.md tells users to register their own experiment rather than adding built-ins:
 
-> Register your own via `afplotter.experiments.registry.register(...)` rather than adding more built-ins for experiments this repo maintainer is not part of.
+> Register your own via `afplotter.experiments.registry.register(...)` rather than adding more built-ins for experiments this repo'\''s maintainer isn'\''t part of.
 
 But there is no worked example of doing that anywhere in `docs/` or `examples/`.
 
@@ -315,3 +315,25 @@ Expected: prints `docs/superpowers/plans/2026-08-03-clear-the-decks.md`.
 **#26, `legend_ncol`.** Cannot be planned yet. The spec settled the *break policy* (rename outright, no shim) but deliberately left the design open between issue option 1 (rename only), option 2 (expose `ncol` directly, dropping auto-wrap), and option 3 (rename plus fixing the constant-headroom bug, where a 1-entry legend reserves the same vertical space as a 4-entry one). Those yield different implementations and different tests, so #26 needs its own brainstorming session before a plan can exist. Start it only after #21 has merged — the spec's ordering rationale depends on #21's kwargs-splat rewrite landing first.
 
 Call sites the eventual #26 plan must cover, verified against `baseplotter.py` at `8632989`: the default at `:103`, the property pair at `:178`–`:183`, the headroom read at `:403`, the `ncol` computation at `:430` feeding the legend call at `:431`, plus `docs/getting-started.md:25`, `examples/workflow_demo.py:97` and its comment at `:93`–`:95`, and `tests/test_baseplotter.py:29` and `:270`.
+
+---
+
+## Outcome
+
+`.superpowers/sdd/` is gitignored, so this section is the only committed record that this
+plan ran. Recorded factually, without ticking the checkboxes above:
+
+- **Task 1.** PR #27 merged with a merge commit (`9f8e89d`). Issue #23 auto-closed with
+  `stateReason: COMPLETED`.
+- **Task 2.** Issue #29, "Add a worked example of registering a custom experiment", was
+  filed.
+- **Task 3.** `PackageSetup` was archived as annotated tag `archive/PackageSetup` (tip
+  commit `5509ce3`), carrying the branch's provenance and referencing #29. The tag was
+  confirmed present on the remote via `git ls-remote --tags` *before* the branch ref was
+  deleted. The IceCube files (`i3.py`, `icecube.mplstyle`) remain recoverable from the tag.
+- **Task 4.** The seven verifiably-merged branches were deleted. `git push origin --delete`
+  was **blocked by the Claude Code permission classifier**; per the plan's "Known execution
+  hazard," the agent did not work around it — the repository maintainer ran the deletion
+  manually. The agent's own contribution was limited to the verification steps (merge-base
+  checks before, `git branch -r` / CI checks after).
+- **Task 5.** This plan's own branch merged as PR #30, merge commit `0a25b7b`.
