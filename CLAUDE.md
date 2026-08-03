@@ -148,6 +148,5 @@ Open follow-ups:
 - Only `BelleII` (real, Alex's own style) and `Generic` (neutral matplotlib-defaults fallback) ship
   built in. Register your own via `afplotter.experiments.registry.register(...)` rather than adding
   more built-ins for experiments this repo's maintainer isn't part of.
-- `importlib_resources` is declared as a runtime dependency but never imported — drop it.
 - A few tests in `tests/test_histogramplot.py` assert only "didn't crash" — see the testing
   philosophy above.
