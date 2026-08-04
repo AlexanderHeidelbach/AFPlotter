@@ -26,7 +26,7 @@ def test_default_properties():
     assert plotter.xlabel == "x"
     assert plotter.ylabel == "y"
     assert plotter.log is False
-    assert plotter.legend_ncol == 4
+    assert plotter.legend_max_rows == 4
 
 
 def test_property_setters_roundtrip():
@@ -267,7 +267,7 @@ def test_add_text_to_plot_multiple_extra_text_rows_stack_without_overlap():
 
 def test_set_axislimits_linear_expands_ylim_for_legend():
     plotter = ConcretePlotter()
-    plotter.legend_ncol = 2
+    plotter.legend_max_rows = 2
     fig, ax = plt.subplots()
     ax.plot([0, 1], [0, 1])
     original_top = ax.get_ylim()[1]
