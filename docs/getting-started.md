@@ -22,7 +22,7 @@ and emits a `RuntimeWarning`.
 Every plotter shares these (set as plain attributes):
 
 - `figsize`, `xlabel`, `ylabel`, `xlim`, `ylim`, `log`, `xlog`
-- `legend_ncol`, `legend_title`, `legend_loc`
+- `legend_max_rows`, `legend_title`, `legend_loc`
 - `watermark`, `luminosity_value`, `luminosity_unit`
 - `savedir`, `savename`, `saveformat` (or `savepath` for a full explicit path)
 
