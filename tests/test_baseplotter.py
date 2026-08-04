@@ -26,7 +26,34 @@ def test_default_properties():
     assert plotter.xlabel == "x"
     assert plotter.ylabel == "y"
     assert plotter.log is False
-    assert plotter.legend_ncol == 4
+    assert plotter.legend_max_rows == 4
+
+
+def _legend_column_count(max_rows, n_labels):
+    """Render a legend with n_labels entries and count its columns from text x-positions.
+
+    Within a column every label shares an x-position, so the number of distinct
+    x-positions is the column count. Uses only public matplotlib API.
+    """
+    plotter = ConcretePlotter()
+    plotter.legend_max_rows = max_rows
+    fig, ax = plt.subplots()
+    for i in range(n_labels):
+        ax.plot([0, 1], [i, i], label=f"entry {i}")
+    plotter._add_legend(ax=ax)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    # Bucket to 5px: columns sit hundreds of pixels apart, so this absorbs any
+    # sub-pixel per-row jitter without ever merging two real columns.
+    x_positions = {round(text.get_window_extent(renderer).x0 / 5) for text in ax.get_legend().get_texts()}
+    plt.close(fig)
+    return len(x_positions)
+
+
+def test_legend_max_rows_caps_rows_and_grows_columns():
+    """legend_max_rows is a row cap: raising it must *lower* the column count."""
+    assert _legend_column_count(max_rows=3, n_labels=6) == 2
+    assert _legend_column_count(max_rows=6, n_labels=6) == 1
 
 
 def test_property_setters_roundtrip():
@@ -267,7 +294,7 @@ def test_add_text_to_plot_multiple_extra_text_rows_stack_without_overlap():
 
 def test_set_axislimits_linear_expands_ylim_for_legend():
     plotter = ConcretePlotter()
-    plotter.legend_ncol = 2
+    plotter.legend_max_rows = 2
     fig, ax = plt.subplots()
     ax.plot([0, 1], [0, 1])
     original_top = ax.get_ylim()[1]

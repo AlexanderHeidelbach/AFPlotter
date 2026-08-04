@@ -100,7 +100,7 @@ class BasePlotter(ABC):
         self._luminosity_unit: str = "fb"
         self._log: bool = False
         self._xlog: bool = False
-        self._legend_ncol: int = 4
+        self._legend_max_rows: int = 4
         self._legend_title: str | None = None
         self._legend_loc: str = "best"
         self._xlim: tuple[float, float] | None = None
@@ -175,12 +175,27 @@ class BasePlotter(ABC):
         return f"∫$L\\,\\mathrm{{d}}t\\;=\\;${self.luminosity_value:.0f}$\\;\\mathrm{{{self.luminosity_unit}}}^{{-1}}$"
 
     @property
-    def legend_ncol(self) -> int:
-        return self._legend_ncol
+    def legend_max_rows(self) -> int:
+        """Maximum number of entries stacked in one legend column.
 
-    @legend_ncol.setter
-    def legend_ncol(self, legend_ncol: int) -> None:
-        self._legend_ncol = legend_ncol
+        The legend's column count is derived from this, not set by it:
+        ``ncol = ceil(len(labels) / legend_max_rows)``. Raising this value
+        therefore produces *fewer*, taller columns; lowering it produces more,
+        shorter ones. To force a single column, set it to at least the number
+        of legend entries.
+
+        :return: The per-column row cap. Defaults to 4.
+        """
+        return self._legend_max_rows
+
+    @legend_max_rows.setter
+    def legend_max_rows(self, legend_max_rows: int) -> None:
+        """Set the maximum number of entries stacked in one legend column.
+
+        :param legend_max_rows: The per-column row cap. Values below 1 are not
+            validated here; 0 raises ZeroDivisionError when the legend is drawn.
+        """
+        self._legend_max_rows = legend_max_rows
 
     @property
     def legend_title(self) -> str | None:
@@ -400,7 +415,7 @@ class BasePlotter(ABC):
         """Set axis limits depending on number of legend and text lines"""
         xlim = self.xlim
         ylim = self.ylim if ylim is None else ylim
-        lines_legend = self.legend_ncol
+        lines_legend = self.legend_max_rows
         lines_text = len(self.text) + 1
         if xlim is not None:
             ax.set_xlim(left=xlim[0], right=xlim[1])
@@ -427,7 +442,7 @@ class BasePlotter(ABC):
             labels.extend(label)
 
         if labels:
-            ncol = len(labels) // self.legend_ncol + (1 if len(labels) % self.legend_ncol != 0 else 0)
+            ncol = len(labels) // self.legend_max_rows + (1 if len(labels) % self.legend_max_rows != 0 else 0)
             legend_kwargs: dict[str, Any] = {
                 "ncol": ncol,
                 "title": self.legend_title,

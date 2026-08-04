@@ -24,3 +24,6 @@ examples/output/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Superpowers SDD scratch (ledgers, briefs, review packages)
+.superpowers/

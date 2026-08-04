@@ -90,11 +90,11 @@ def _build_stacked_pull_plotter(data: dict[str, np.ndarray]) -> HistogramPlotter
     plotter.watermark = "(Own Work)"
     # "best" (the default) places the legend over the empty upper-left corner of the
     # axes -- which is exactly where the watermark text lives, so it occludes
-    # "(Own Work)". With the default legend_ncol=4 the 5 legend entries here wrap
-    # into a 2-column box wide enough to span the axes regardless of anchor, so also
-    # force a single narrow column (legend_ncol >= len(labels)) before anchoring it
-    # to the upper-right corner, away from the watermark.
-    plotter.legend_ncol = 5
+    # "(Own Work)". With the default legend_max_rows=4 the 5 legend entries here
+    # spill into a 2-column box wide enough to span the axes regardless of anchor,
+    # so also force a single narrow column (legend_max_rows >= len(labels)) before
+    # anchoring it to the upper-right corner, away from the watermark.
+    plotter.legend_max_rows = 5
     plotter.legend_loc = "upper right"
 
     # add_pull draws its own copy of this line on the main panel (to pick up
