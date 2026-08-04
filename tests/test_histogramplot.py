@@ -415,3 +415,24 @@ def test_histogram_2d_plotter_end_to_end(synthetic_histogram):
     ax = plotter.plot(save=False)
     assert ax is not None
     plt.close(ax.figure)
+
+
+def test_2d_plot_rejects_a_histogram_without_raw_data(tmp_path):
+    """A loaded (binned-only) histogram must fail with a message naming the real cause.
+
+    Without the guard this reaches hist2d(x=None) and raises from inside matplotlib, naming
+    nothing useful. Matching on the message is the point of the test -- asserting merely that
+    "something raised" would pass against the broken behaviour too.
+    """
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 10.0, 6)
+    hist.add_entry(HistogramEntry(name="x", array=np.random.default_rng(0).normal(5.0, 2.0, 200)))
+    path = tmp_path / "h.json"
+    hist.save(path)
+
+    plot2d = Histogram2DPlot(Histogram.load(path), Histogram.load(path))
+    fig, ax = plt.subplots()
+    plot2d.ax = ax
+    with pytest.raises(ValueError, match="raw event data"):
+        plot2d.plot()
+    plt.close(fig)

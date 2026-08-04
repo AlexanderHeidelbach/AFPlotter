@@ -451,6 +451,15 @@ class Histogram2DPlot:
             # Should not reach here due to checks above, but a fallback just in case
             raise ValueError("Unexpected data state encountered.")
 
+        for axis_name, axis_data in (("x", x_data), ("y", y_data)):
+            if axis_data is None:
+                raise ValueError(
+                    f"The {axis_name} histogram has no raw event data (loaded from a binned-only "
+                    "file, or cleared via add_entry(clear=True)). Histogram2DPlot bins raw arrays "
+                    "at plot time, so it cannot plot binned-only input. Rebuild the histogram from "
+                    "the source data to make a 2D plot."
+                )
+
         heatmap = self.ax.hist2d(
             x=x_data,
             y=y_data,
