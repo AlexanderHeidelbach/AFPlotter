@@ -508,4 +508,24 @@ BODY
      nothing about what ran. Record here: final commit SHA, test count, what was verified
      on which Python version, and anything that deviated from the plan. -->
 
-Not yet executed.
+Executed 2026-08-04 via superpowers:subagent-driven-development on branch
+`fix/legend-max-rows-rename`.
+
+- Task 1 — commit 02e6e7f — rename across `baseplotter.py` and `tests/test_baseplotter.py`.
+  Review clean.
+- Task 2 — commit 6d3a179 — the column-count test. Review clean. The falsification step was
+  performed and independently reproduced by the controller: patching the divisor to
+  `ncol = self.legend_max_rows` makes the test fail, restoring makes it pass.
+- Task 3 — commit 70144e9 — example and docs. Review clean. The three committed PNGs under
+  `docs/img/workflow/` were confirmed byte-identical after a fresh run of
+  `examples/workflow_demo.py`, both by the implementer and independently by the controller.
+- Task 4 gate: `ruff check` clean, `ruff format --check` clean,
+  `mypy --namespace-packages --explicit-package-bases --ignore-missing-imports src/` reported
+  Success, and the suite went 139 → 140 passing. Verified on Python 3.10 locally; the 3.14
+  leg runs in CI.
+- One extra commit, eeddeb8, added `.superpowers/` to `.gitignore` — it had never been
+  ignored anywhere despite a note claiming otherwise.
+- Final whole-branch review found no Critical or Important issues. Four Minor findings;
+  three were fixed in a follow-up commit (test bucket tolerance, setter docstring accuracy,
+  this Outcome section). The fourth — three commits missing `Co-Authored-By`/`Claude-Session`
+  trailers — was accepted as-is rather than rewriting history for a cosmetic inconsistency.

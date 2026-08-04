@@ -192,7 +192,8 @@ class BasePlotter(ABC):
     def legend_max_rows(self, legend_max_rows: int) -> None:
         """Set the maximum number of entries stacked in one legend column.
 
-        :param legend_max_rows: The per-column row cap. Must be at least 1.
+        :param legend_max_rows: The per-column row cap. Values below 1 are not
+            validated here; 0 raises ZeroDivisionError when the legend is drawn.
         """
         self._legend_max_rows = legend_max_rows
 

@@ -43,7 +43,9 @@ def _legend_column_count(max_rows, n_labels):
     plotter._add_legend(ax=ax)
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
-    x_positions = {round(text.get_window_extent(renderer).x0) for text in ax.get_legend().get_texts()}
+    # Bucket to 5px: columns sit hundreds of pixels apart, so this absorbs any
+    # sub-pixel per-row jitter without ever merging two real columns.
+    x_positions = {round(text.get_window_extent(renderer).x0 / 5) for text in ax.get_legend().get_texts()}
     plt.close(fig)
     return len(x_positions)
 
