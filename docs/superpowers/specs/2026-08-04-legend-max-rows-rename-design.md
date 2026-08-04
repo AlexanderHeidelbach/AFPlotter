@@ -125,8 +125,10 @@ reading `legend_max_rows` and "fixing" the divisor into a straight pass-through 
 6 labels, legend_max_rows=6  ->  legend renders 1 column
 ```
 
-Both cases are required: the first alone passes under a pass-through implementation for some
-inputs, the second discriminates it.
+Both cases are required. Either one alone already fails under a pass-through implementation
+(with 6 labels, `ceil(6 / m) == m` has no integer solution), but a single point cannot pin the
+*direction* of the relationship — that raising `legend_max_rows` lowers the column count. Two
+points do, and direction is precisely what the old name got backwards.
 
 Assert on **rendered geometry** — the count of distinct x-positions among the legend's text
 artists — not on `Legend._ncols`. CI spans two matplotlib versions across the 3.10 and 3.14
