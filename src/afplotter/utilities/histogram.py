@@ -1,4 +1,3 @@
-import copy
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -55,16 +54,48 @@ class HistogramEntry:
         for key in ["array", "counts", "errors"]:
             if isinstance(data[key], np.ndarray):
                 data[key] = data[key].tolist()
+        if isinstance(data["weight"], np.ndarray):
+            data["weight"] = data["weight"].tolist()
         return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "HistogramEntry":
         """Creates an instance from a dictionary."""
+        data = dict(data)  # avoid mutating the caller's dict
         # Convert lists back to numpy arrays
         for key in ["array", "counts", "errors"]:
             if data.get(key) is not None:
                 data[key] = np.array(data[key])
+        if isinstance(data.get("weight"), list):
+            data["weight"] = np.array(data["weight"])
+        elif data.get("weight") is None:
+            # A per-event weight is nulled by Histogram.save() alongside `array` (it is
+            # meaningless once the events it indexed are gone); restore the dataclass default.
+            data["weight"] = 1.0
         return cls(**data)
+
+    def as_binned_dict(self) -> dict[str, Any]:
+        """Serializable dict for :meth:`Histogram.save`, without materializing event-length data.
+
+        Unlike :attr:`as_dict`, this never converts ``array`` (or a per-event ``weight``, which
+        is the same length as ``array``) to a Python list -- both are omitted outright, so
+        building this dict costs O(n_bins), not O(n_events). A scalar ``weight`` is preserved.
+        """
+        weight: float | np.ndarray | None = self.weight
+        if isinstance(weight, np.ndarray):
+            weight = None
+        return {
+            "name": self.name,
+            "latex_name": self.latex_name,
+            "array": None,
+            "counts": self.counts.tolist(),
+            "errors": self.errors.tolist(),
+            "weight": weight,
+            "color": self.color,
+            "hatch": self.hatch,
+            "show_label": self.show_label,
+            "type": self.type,
+        }
 
     def get_weights(self, pot: float = 1.0) -> np.ndarray:
         return np.ones_like(self.array) * self.weight**pot
@@ -130,18 +161,29 @@ class Histogram:
 
         Only binned results are stored — counts, errors, binning, metadata and per-entry
         styling. Each entry's ``array`` is omitted, so the file size does not grow with the
-        sample size. The histogram in memory is left untouched.
+        sample size, and building the payload never materializes ``array`` (or a per-event
+        ``weight``, which is dropped alongside it for the same reason). The histogram in
+        memory is left untouched.
 
         A histogram loaded from such a file cannot be used for a 2D plot, because
         :class:`~afplotter.histogramplot.Histogram2DPlot` bins raw arrays at plot time.
 
         :param path: Destination file path. Any parent directory must already exist.
         """
-        payload = copy.deepcopy(self.as_dict)
-        for section in ("entries", "signal"):
-            for entry in payload[section].values():
-                entry["array"] = None
-        payload["format_version"] = SAVE_FORMAT_VERSION
+        binning = (
+            self.binning
+            if isinstance(self.binning, int)
+            else self.binning.tolist()
+            if self.binning is not None
+            else None
+        )
+        payload = {
+            "binning": binning,
+            "metadata": self.metadata,
+            "entries": {name: entry.as_binned_dict() for name, entry in self.entries.items()},
+            "signal": {name: entry.as_binned_dict() for name, entry in self.signal.items()},
+            "format_version": SAVE_FORMAT_VERSION,
+        }
         Path(path).write_text(json.dumps(payload))
 
     @classmethod
@@ -151,17 +193,29 @@ class Histogram:
         The returned histogram has no raw event data: ``get_data()`` yields ``None`` for
         every entry.
 
+        .. warning::
+            Returned entries are binned-only; their stored ``errors`` are authoritative for
+            a weighted sample (``sqrt(sum(w**2))``), not necessarily ``sqrt(counts)``. Passing
+            such an entry back through :meth:`add_entry` recomputes ``errors`` from ``counts``
+            (since ``array`` is ``None``) and silently overwrites the restored value with the
+            wrong number. Not fixed here — tracked as issue #37.
+
         :param path: Path to a JSON file written by :meth:`save`.
         :return: The reconstructed histogram.
-        :raises ValueError: If the file's ``format_version`` is not supported.
+        :raises ValueError: If the file's ``format_version`` is not supported, or the file's
+            top-level JSON is not an object.
         """
         payload = json.loads(Path(path).read_text())
+        if not isinstance(payload, dict):
+            raise ValueError(f"Malformed histogram file {path}: expected a JSON object at the top level.")
         version = payload.get("format_version")
         if version != SAVE_FORMAT_VERSION:
             raise ValueError(
                 f"Unsupported format_version {version!r} in {path}; "
                 f"this version of AFPlotter writes and reads format_version {SAVE_FORMAT_VERSION}."
             )
+        if "entries" not in payload:
+            raise ValueError(f"Malformed histogram file {path}: missing required key 'entries'.")
         return cls.from_dict(payload)
 
     @property
