@@ -1,4 +1,5 @@
 # tests/utilities/test_histogram.py
+import json
 import numpy as np
 import pytest
 
@@ -175,3 +176,96 @@ def test_histogram_roundtrip_preserves_unset_binning():
     assert restored.binning is None
     assert restored.entries == {}
     assert restored.signal == {}
+
+
+def test_save_load_round_trip(tmp_path):
+    """Counts, errors, binning, signal split and styling must survive a save/load cycle.
+
+    Fixture values are chosen so a broken round-trip cannot coincidentally pass: the errors
+    are NOT sqrt(counts), so code that recomputes them instead of restoring them fails here.
+    """
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    hist.add_entry(
+        HistogramEntry(
+            name="bkg",
+            latex_name="Background",
+            counts=np.array([10.0, 20.0, 30.0, 40.0, 50.0]),
+            errors=np.array([1.5, 2.5, 3.5, 4.5, 5.5]),
+            color="#123456",
+            hatch="//",
+        )
+    )
+    hist.add_entry(
+        HistogramEntry(
+            name="sig",
+            latex_name="Signal",
+            counts=np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
+            errors=np.array([0.5, 0.5, 0.5, 0.5, 0.5]),
+            type="signal",
+        )
+    )
+    hist.metadata["column_name"] = "pt"
+
+    path = tmp_path / "h.json"
+    hist.save(path)
+    restored = Histogram.load(path)
+
+    assert np.allclose(restored.get_bin_counts()[0], hist.get_bin_counts()[0])
+    assert np.allclose(restored.get_bin_errors()[0], hist.get_bin_errors()[0])
+    assert np.allclose(restored.binning, hist.binning)
+    assert restored.get_names() == hist.get_names()
+    assert restored.get_signal_names() == hist.get_signal_names()
+    assert restored.get_colors() == hist.get_colors()
+    assert restored.get_hatches() == hist.get_hatches()
+    assert restored.get_latex_names() == hist.get_latex_names()
+    assert restored.metadata["column_name"] == "pt"
+
+
+def test_save_does_not_mutate_the_source_histogram(tmp_path):
+    """Saving must not clear the caller's raw arrays as a side effect."""
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 10.0, 6)
+    raw = np.random.default_rng(0).normal(5.0, 2.0, 500)
+    hist.add_entry(HistogramEntry(name="bkg", array=raw.copy()))
+
+    hist.save(tmp_path / "h.json")
+
+    assert hist.get_data()[0] is not None
+    assert np.allclose(hist.get_data()[0], raw)
+
+
+def test_saved_file_size_does_not_scale_with_sample_size(tmp_path):
+    """The saved payload must be binned-only; a 100x larger sample must not grow the file.
+
+    This is the property that makes caching worthwhile, and it fails loudly if raw event
+    arrays ever creep back into the payload.
+    """
+    rng = np.random.default_rng(0)
+    sizes = []
+    for n_events in (1_000, 100_000):
+        hist = Histogram()
+        hist.binning = np.linspace(0.0, 10.0, 11)
+        hist.add_entry(HistogramEntry(name="bkg", array=rng.normal(5.0, 2.0, n_events)))
+        path = tmp_path / f"h_{n_events}.json"
+        hist.save(path)
+        sizes.append(path.stat().st_size)
+
+    small, large = sizes
+    assert large < small * 1.1, f"file grew with sample size: {small} -> {large} bytes"
+
+
+def test_load_rejects_an_unknown_format_version(tmp_path):
+    """A future format must fail with a clear message, not a KeyError deep in from_dict."""
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    hist.add_entry(HistogramEntry(name="bkg", counts=np.array([1.0, 2.0, 3.0, 4.0, 5.0])))
+    path = tmp_path / "h.json"
+    hist.save(path)
+
+    payload = json.loads(path.read_text())
+    payload["format_version"] = 99
+    path.write_text(json.dumps(payload))
+
+    with pytest.raises(ValueError, match="format_version"):
+        Histogram.load(path)

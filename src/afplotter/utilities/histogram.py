@@ -1,7 +1,13 @@
+import copy
+import json
 from collections import defaultdict
+from pathlib import Path
 import numpy as np  # type: ignore
 from typing import Any
 from dataclasses import dataclass, field, asdict
+
+SAVE_FORMAT_VERSION = 1
+"""Version of the on-disk JSON format written by :meth:`Histogram.save`."""
 
 
 @dataclass
@@ -118,6 +124,45 @@ class Histogram:
         instance.entries = {name: HistogramEntry.from_dict(entry_data) for name, entry_data in data["entries"].items()}
         instance.signal = {name: HistogramEntry.from_dict(entry_data) for name, entry_data in data["signal"].items()}
         return instance
+
+    def save(self, path: str | Path) -> None:
+        """Write this histogram to a JSON file, without its raw event data.
+
+        Only binned results are stored — counts, errors, binning, metadata and per-entry
+        styling. Each entry's ``array`` is omitted, so the file size does not grow with the
+        sample size. The histogram in memory is left untouched.
+
+        A histogram loaded from such a file cannot be used for a 2D plot, because
+        :class:`~afplotter.histogramplot.Histogram2DPlot` bins raw arrays at plot time.
+
+        :param path: Destination file path. Any parent directory must already exist.
+        """
+        payload = copy.deepcopy(self.as_dict)
+        for section in ("entries", "signal"):
+            for entry in payload[section].values():
+                entry["array"] = None
+        payload["format_version"] = SAVE_FORMAT_VERSION
+        Path(path).write_text(json.dumps(payload))
+
+    @classmethod
+    def load(cls, path: str | Path) -> "Histogram":
+        """Read a histogram written by :meth:`save`.
+
+        The returned histogram has no raw event data: ``get_data()`` yields ``None`` for
+        every entry.
+
+        :param path: Path to a JSON file written by :meth:`save`.
+        :return: The reconstructed histogram.
+        :raises ValueError: If the file's ``format_version`` is not supported.
+        """
+        payload = json.loads(Path(path).read_text())
+        version = payload.get("format_version")
+        if version != SAVE_FORMAT_VERSION:
+            raise ValueError(
+                f"Unsupported format_version {version!r} in {path}; "
+                f"this version of AFPlotter writes and reads format_version {SAVE_FORMAT_VERSION}."
+            )
+        return cls.from_dict(payload)
 
     @property
     def binning(self) -> np.ndarray | int | None:
