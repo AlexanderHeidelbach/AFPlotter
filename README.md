@@ -37,6 +37,10 @@ Re-run the same command any time to pick up updates.
 
 ## Quickstart
 
+Snippets below write output to `examples/output/`, which is gitignored, so
+following along in a clone leaves no stray PNGs at the repo root. Create it
+first with `mkdir -p examples/output`.
+
 ```python
 from afplotter import plot_histogram, set_experiment
 import numpy as np
