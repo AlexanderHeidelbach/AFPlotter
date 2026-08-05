@@ -3,10 +3,15 @@ import json
 import numpy as np
 import pytest
 
+from afplotter.genericplot import GenericPlot, InsetPlot
 from afplotter.utilities.plotspec import (
     PLOT_FORMAT_VERSION,
     UnserializableValue,
+    decode_generic_plot,
+    decode_inset,
     decode_value,
+    encode_generic_plot,
+    encode_inset,
     encode_value,
 )
 
@@ -92,3 +97,91 @@ def test_encode_value_rejects_an_unserializable_value_nested_in_a_container():
     with pytest.raises(UnserializableValue):
         encode_value({"transform": ax.transAxes})
     plt.close("all")
+
+
+def test_encode_generic_plot_round_trips_method_args_and_kwargs():
+    plot = GenericPlot("errorbar", np.array([1.0, 2.0]), np.array([3.0, 4.0]), color="red", ls="--")
+    data, dropped = encode_generic_plot(plot)
+    assert dropped == []
+    json.dumps(data)
+
+    restored = decode_generic_plot(data)
+    assert restored.plotmethod == "errorbar"
+    assert np.allclose(restored.args[0], [1.0, 2.0])
+    assert np.allclose(restored.args[1], [3.0, 4.0])
+    assert restored.kwargs == {"color": "red", "ls": "--"}
+
+
+def test_encode_generic_plot_raises_on_an_unserializable_kwarg():
+    from matplotlib import pyplot as plt
+
+    ax = plt.subplots()[1]
+    plot = GenericPlot("plot", np.array([1.0]), transform=ax.transAxes)
+    with pytest.raises(UnserializableValue) as excinfo:
+        encode_generic_plot(plot)
+    plt.close("all")
+    assert excinfo.value.where == "kwarg 'transform'"
+
+
+def test_encode_generic_plot_skips_an_unserializable_kwarg_when_asked():
+    from matplotlib import pyplot as plt
+
+    ax = plt.subplots()[1]
+    plot = GenericPlot("plot", np.array([1.0]), color="red", transform=ax.transAxes)
+    data, dropped = encode_generic_plot(plot, skip_unserializable=True)
+    plt.close("all")
+
+    assert dropped == ["kwarg 'transform'"]
+    restored = decode_generic_plot(data)
+    assert restored.kwargs == {"color": "red"}  # the serializable kwarg survives
+
+
+def test_encode_generic_plot_never_skips_a_positional_arg():
+    """Dropping a positional would shift every later argument and change the call."""
+    from matplotlib import pyplot as plt
+
+    ax = plt.subplots()[1]
+    plot = GenericPlot("plot", ax.transAxes, np.array([1.0]))
+    with pytest.raises(UnserializableValue) as excinfo:
+        encode_generic_plot(plot, skip_unserializable=True)
+    plt.close("all")
+    assert excinfo.value.where == "arg 0"
+
+
+def test_encode_inset_round_trips_its_settings_and_reference_block():
+    inset = InsetPlot(
+        plots=[],
+        xlim=(1.0, 2.0),
+        ylim=(3.0, 4.0),
+        width="50%",
+        height="25%",
+        loc="lower left",
+        borderpad=2.0,
+        title="zoom",
+        mark_region=False,
+        mark_kwargs={"ec": "red"},
+        tick_labelsize=6,
+        title_fontsize=11,
+        bbox_to_anchor=(0.1, 0.2, 0.3, 0.4),
+    )
+    refs = {"histplot": True, "generic_plots": [0, 1]}
+    data = encode_inset(inset, refs)
+    json.dumps(data)
+    assert data["plots"] == refs
+
+    sentinel = [object(), object()]
+    restored = decode_inset(data, sentinel)
+    assert restored.plots is sentinel
+    assert restored.xlim == (1.0, 2.0)
+    assert isinstance(restored.xlim, tuple)
+    assert restored.ylim == (3.0, 4.0)
+    assert restored.width == "50%"
+    assert restored.height == "25%"
+    assert restored.loc == "lower left"
+    assert restored.borderpad == 2.0
+    assert restored.title == "zoom"
+    assert restored.mark_region is False
+    assert restored.mark_kwargs == {"ec": "red"}
+    assert restored.tick_labelsize == 6
+    assert restored.title_fontsize == 11
+    assert restored.bbox_to_anchor == (0.1, 0.2, 0.3, 0.4)

@@ -87,3 +87,97 @@ def decode_value(data: Any) -> Any:
     if isinstance(data, list):
         return [decode_value(item) for item in data]
     return data
+
+
+_INSET_FIELDS = (
+    "xlim",
+    "ylim",
+    "width",
+    "height",
+    "loc",
+    "borderpad",
+    "title",
+    "mark_region",
+    "mark_kwargs",
+    "tick_labelsize",
+    "title_fontsize",
+    "bbox_to_anchor",
+)
+
+
+def encode_generic_plot(plot: Any, *, skip_unserializable: bool = False) -> tuple[dict[str, Any], list[str]]:
+    """Encode one :class:`~afplotter.genericplot.GenericPlot`.
+
+    :param plot: The plot to encode.
+    :param skip_unserializable: Drop unserializable *keyword* arguments instead of raising.
+        Positional arguments are never dropped -- removing one would shift every later
+        argument and silently change the matplotlib call.
+    :return: ``(payload, dropped)`` where ``dropped`` lists the descriptors of any skipped
+        kwargs, e.g. ``["kwarg 'transform'"]``.
+    :raises UnserializableValue: On an unserializable positional argument, or on an
+        unserializable kwarg when ``skip_unserializable`` is false.
+    """
+    args = []
+    for index, arg in enumerate(plot.args):
+        try:
+            args.append(encode_value(arg))
+        except UnserializableValue as error:
+            error.where = error.where or f"arg {index}"
+            raise
+
+    kwargs = {}
+    dropped = []
+    for key, value in plot.kwargs.items():
+        try:
+            kwargs[key] = encode_value(value)
+        except UnserializableValue as error:
+            where = error.where or f"kwarg {key!r}"
+            if not skip_unserializable:
+                error.where = where
+                raise
+            dropped.append(where)
+
+    return {"plotmethod": plot.plotmethod, "args": args, "kwargs": kwargs}, dropped
+
+
+def decode_generic_plot(data: dict[str, Any]) -> Any:
+    """Invert :func:`encode_generic_plot`.
+
+    :param data: One payload written by :func:`encode_generic_plot`.
+    :return: The restored :class:`~afplotter.genericplot.GenericPlot`.
+    """
+    from afplotter.genericplot import GenericPlot
+
+    args = [decode_value(arg) for arg in data["args"]]
+    kwargs = {key: decode_value(value) for key, value in data["kwargs"].items()}
+    return GenericPlot(data["plotmethod"], *args, **kwargs)
+
+
+def encode_inset(inset: Any, plot_refs: dict[str, Any]) -> dict[str, Any]:
+    """Encode one :class:`~afplotter.genericplot.InsetPlot`.
+
+    The inset's ``plots`` are stored as the caller's symbolic reference block rather than
+    by value: they are the *same objects* the main axes replays, and copying them would
+    turn "the whole plot, zoomed" into a frozen duplicate on load.
+
+    :param inset: The inset to encode.
+    :param plot_refs: Symbolic references to the plotter's own objects, stored verbatim.
+    :return: JSON-safe data.
+    :raises UnserializableValue: If any of the inset's own settings cannot be encoded.
+    """
+    data = {field: encode_value(getattr(inset, field)) for field in _INSET_FIELDS}
+    data["plots"] = plot_refs
+    return data
+
+
+def decode_inset(data: dict[str, Any], resolved_plots: list[Any]) -> Any:
+    """Invert :func:`encode_inset`.
+
+    :param data: One payload written by :func:`encode_inset`.
+    :param resolved_plots: The live plot objects the caller resolved ``data["plots"]`` to.
+    :return: The restored :class:`~afplotter.genericplot.InsetPlot`.
+    """
+    from afplotter.genericplot import InsetPlot
+
+    settings = {field: decode_value(data[field]) for field in _INSET_FIELDS}
+    return InsetPlot(plots=resolved_plots, **settings)
