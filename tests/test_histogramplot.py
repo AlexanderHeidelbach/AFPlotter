@@ -592,6 +592,7 @@ def test_histogram_2d_plotter_save_load_round_trips_the_spec(tmp_path):
     histplot.cmax = 42.0
     histplot.cbar_label = "events / bin"
     histplot.density = True
+    histplot.log = True
     plotter = Histogram2DPlotter(histplot, HistogramVariable("mass", "GeV"), HistogramVariable("time", "ns"))
     plotter.figsize = (7, 3)
     plotter.add_generic_plot(GenericPlot("plot", np.array([1.0, 2.0]), np.array([3.0, 4.0]), color="red"))
@@ -612,6 +613,7 @@ def test_histogram_2d_plotter_save_load_round_trips_the_spec(tmp_path):
     assert loaded.histplot.cmax == 42.0
     assert loaded.histplot.cbar_label == "events / bin"
     assert loaded.histplot.density is True
+    assert loaded.histplot.log is True
     assert loaded.generic_plots[0].kwargs == {"color": "red"}
     # The data came from the caller, not the file.
     assert loaded.histplot.xhistogram is fresh_x
