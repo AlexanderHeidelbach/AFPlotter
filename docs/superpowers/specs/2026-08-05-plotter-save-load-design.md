@@ -49,6 +49,10 @@ best-effort was rejected: this library has just shipped two fixes for silent div
 is the same failure in a new place. The opt-out exists because refusing outright would make one
 stray `transform=` kwarg block saving an otherwise perfectly serializable plot.
 
+**Only keyword arguments are skippable.** An unserializable *positional* argument always raises,
+even under `skip_unserializable=True`: dropping one shifts every later argument by a position and
+silently changes which matplotlib call gets made, which is a worse outcome than refusing.
+
 **Format: JSON, one file per plotter.** `HistogramPlotter` embeds its histogram via #9's
 `as_binned_dict`, so a single ~2 KB file holds spec plus data — the "hand a colleague one file"
 case from the issue. `PLOT_FORMAT_VERSION = 1` is separate from #9's `SAVE_FORMAT_VERSION`: the
