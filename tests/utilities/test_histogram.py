@@ -394,3 +394,17 @@ def test_add_entry_supplied_errors_win_over_a_raw_array():
     hist.add_entry(HistogramEntry(name="both", array=array, counts=counts, errors=errors))
 
     assert np.allclose(hist.entries["both"].errors, errors)
+
+
+def test_add_entry_rejects_errors_of_the_wrong_length():
+    """A mismatched errors array is a caller bug; fail here, not deep inside plotting."""
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    entry = HistogramEntry(
+        name="pre",
+        counts=np.array([10.0, 20.0, 30.0, 40.0, 50.0]),
+        errors=np.array([1.0, 1.0, 1.0]),
+    )
+
+    with pytest.raises(ValueError, match=r"'pre'.*3 errors.*5 counts"):
+        hist.add_entry(entry)

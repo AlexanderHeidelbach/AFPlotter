@@ -246,6 +246,12 @@ class Histogram:
         binning = self.binning
         if isinstance(binning, int):
             raise ValueError("Binning was not resolved to an array before computing entry errors")
+        if len(entry.errors) not in (0, len(entry.counts)):
+            raise ValueError(
+                f"Entry '{entry.name}' was given {len(entry.errors)} errors "
+                f"for {len(entry.counts)} counts. Supplied errors must have one value per bin."
+            )
+
         if len(entry.errors) == 0:
             entry.compute_errors(binning=binning)
 
