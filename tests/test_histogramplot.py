@@ -476,7 +476,8 @@ def test_histogram_plotter_save_load_round_trips_spec_and_data(tmp_path, synthet
 
     assert loaded.variable.name == "mass"
     assert loaded.variable.unit == "GeV"
-    # Proves restoration wrote _xlabel: xlabel is a read-only property on this class.
+    # xlabel is a read-only property derived from `variable`, not from a stored _xlabel;
+    # this proves `variable` was restored.
     assert loaded.xlabel == "mass (GeV)"
 
     assert loaded.histplot.stacked is True

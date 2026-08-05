@@ -527,6 +527,7 @@ class HistogramPlotter(BasePlotter):
         self.pull_plots: list[GenericPlot] = []
         self.pull_ylim: tuple[float, float] | None = None
         self.color_map_kwargs: dict[str, Any] = {}
+        self._dropped_on_load: list[str] = []
         self.pull_label: str = "Pull"
 
         self.log = self.histplot.log
@@ -922,7 +923,7 @@ class HistogramPlotter(BasePlotter):
             false. Nothing is written in that case.
         :return: None
         """
-        dropped: list[str] = []
+        dropped: list[str] = list(self._dropped_on_load)
 
         def encode_plots(plots: list[GenericPlot], label: str) -> list[dict[str, Any]]:
             encoded = []
@@ -940,7 +941,13 @@ class HistogramPlotter(BasePlotter):
             base = encode_base_plotter(self)
             generic_plots = encode_plots(self.generic_plots, "generic_plots")
             pull_plots = encode_plots(self.pull_plots, "pull_plots")
-            insets = [encode_inset(inset, self._inset_refs(inset)) for inset in self._insets]
+            insets = []
+            for index, inset in enumerate(self._insets):
+                try:
+                    insets.append(encode_inset(inset, self._inset_refs(inset)))
+                except UnserializableValue as error:
+                    error.where = f"_insets[{index}]: {error.where or 'settings'}"
+                    raise
             histplot = {
                 "stacked": self.histplot.stacked,
                 "sig_extra": self.histplot.sig_extra,
@@ -958,7 +965,10 @@ class HistogramPlotter(BasePlotter):
                 "color_map_kwargs": encode_value(self.color_map_kwargs),
             }
         except UnserializableValue as error:
-            raise ValueError(f"Cannot save this plotter: {error.where} holds {error.value_repr}") from error
+            raise ValueError(
+                f"Cannot save this plotter: {error.where} holds {error.value_repr}. "
+                "Remove it, pass skip_unserializable=True, or set it after load."
+            ) from error
 
         payload = {
             "format_version": PLOT_FORMAT_VERSION,
@@ -1038,7 +1048,8 @@ class HistogramPlotter(BasePlotter):
         plotter._insets = [
             decode_inset(data, plotter._resolve_inset_refs(data["plots"])) for data in payload.get("insets", [])
         ]
-        warn_dropped(payload.get("dropped", []))
+        plotter._dropped_on_load = payload.get("dropped", [])
+        warn_dropped(plotter._dropped_on_load)
         return plotter
 
     def _resolve_inset_refs(self, refs: dict[str, Any]) -> list[Any]:
@@ -1066,6 +1077,7 @@ class Histogram2DPlotter(BasePlotter):
         self.yvariable = yvariable
         self.generic_plots: list[GenericPlot] = []
         self.log = self.histplot.log
+        self._dropped_on_load: list[str] = []
 
     @property
     def xlabel(self) -> str:
@@ -1142,7 +1154,7 @@ class Histogram2DPlotter(BasePlotter):
             false. Nothing is written in that case.
         :return: None
         """
-        dropped: list[str] = []
+        dropped: list[str] = list(self._dropped_on_load)
         try:
             base = encode_base_plotter(self)
             generic_plots = []
@@ -1168,7 +1180,10 @@ class Histogram2DPlotter(BasePlotter):
                 "cbar_label": self.histplot.cbar_label,
             }
         except UnserializableValue as error:
-            raise ValueError(f"Cannot save this plotter: {error.where} holds {error.value_repr}") from error
+            raise ValueError(
+                f"Cannot save this plotter: {error.where} holds {error.value_repr}. "
+                "Remove it, pass skip_unserializable=True, or set it after load."
+            ) from error
 
         payload = {
             "format_version": PLOT_FORMAT_VERSION,
@@ -1216,5 +1231,6 @@ class Histogram2DPlotter(BasePlotter):
         )
         decode_base_plotter(plotter, payload["base"])
         plotter.generic_plots = [decode_generic_plot(data) for data in payload.get("generic_plots", [])]
-        warn_dropped(payload.get("dropped", []))
+        plotter._dropped_on_load = payload.get("dropped", [])
+        warn_dropped(plotter._dropped_on_load)
         return plotter

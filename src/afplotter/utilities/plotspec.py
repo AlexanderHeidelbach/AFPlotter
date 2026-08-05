@@ -5,6 +5,7 @@ It knows nothing about plotters themselves -- each plotter's ``save``/``load`` w
 own attributes through these helpers.
 """
 
+import os
 import warnings
 from typing import Any
 
@@ -52,7 +53,12 @@ def encode_value(value: Any) -> Any:
     if isinstance(value, np.ndarray):
         return {_NDARRAY_KEY: value.tolist()}
     if isinstance(value, np.generic):
-        return value.item()
+        item = value.item()
+        if isinstance(item, _JSON_NATIVE):
+            return item
+        raise UnserializableValue(value)
+    if isinstance(value, os.PathLike):
+        return os.fspath(value)
     if isinstance(value, tuple):
         return {_TUPLE_KEY: [encode_value(item) for item in value]}
     if isinstance(value, list):
@@ -166,7 +172,13 @@ def encode_inset(inset: Any, plot_refs: dict[str, Any]) -> dict[str, Any]:
     :return: JSON-safe data.
     :raises UnserializableValue: If any of the inset's own settings cannot be encoded.
     """
-    data = {field: encode_value(getattr(inset, field)) for field in _INSET_FIELDS}
+    data = {}
+    for field in _INSET_FIELDS:
+        try:
+            data[field] = encode_value(getattr(inset, field))
+        except UnserializableValue as error:
+            error.where = error.where or field
+            raise
     data["plots"] = plot_refs
     return data
 

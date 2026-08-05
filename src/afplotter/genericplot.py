@@ -132,6 +132,7 @@ class GenericPlotter(BasePlotter):
 
         self._plots: list[GenericPlot] = []
         self._insets: list[InsetPlot] = []
+        self._dropped_on_load: list[str] = []
 
     def add_generic_plot(self, plotmethod: str, *args: Any, **kwargs: Any) -> None:
         self._plots.append(GenericPlot(plotmethod, *args, **kwargs))
@@ -212,7 +213,7 @@ class GenericPlotter(BasePlotter):
             false. Nothing is written in that case.
         :return: None
         """
-        dropped: list[str] = []
+        dropped: list[str] = list(self._dropped_on_load)
         try:
             base = encode_base_plotter(self)
             plots = []
@@ -220,13 +221,22 @@ class GenericPlotter(BasePlotter):
                 try:
                     data, plot_dropped = encode_generic_plot(plot, skip_unserializable=skip_unserializable)
                 except UnserializableValue as error:
-                    error.where = f"_plots[{index}]: {error.where}"
+                    error.where = f"plots[{index}]: {error.where}"
                     raise
                 plots.append(data)
-                dropped.extend(f"_plots[{index}]: {item}" for item in plot_dropped)
-            insets = [encode_inset(inset, self._inset_refs(inset)) for inset in self._insets]
+                dropped.extend(f"plots[{index}]: {item}" for item in plot_dropped)
+            insets = []
+            for index, inset in enumerate(self._insets):
+                try:
+                    insets.append(encode_inset(inset, self._inset_refs(inset)))
+                except UnserializableValue as error:
+                    error.where = f"_insets[{index}]: {error.where or 'settings'}"
+                    raise
         except UnserializableValue as error:
-            raise ValueError(f"Cannot save this plotter: {error.where} holds {error.value_repr}") from error
+            raise ValueError(
+                f"Cannot save this plotter: {error.where} holds {error.value_repr}. "
+                "Remove it, pass skip_unserializable=True, or set it after load."
+            ) from error
 
         payload = {
             "format_version": PLOT_FORMAT_VERSION,
@@ -238,12 +248,22 @@ class GenericPlotter(BasePlotter):
         Path(path).write_text(json.dumps(payload))
 
     def _inset_refs(self, inset: InsetPlot) -> dict[str, Any]:
-        """Describe an inset's plots as indices into ``self._plots``.
+        """Describe an inset's plots as indices into ``self._plots``, or as an alias.
+
+        ``add_inset(plots=None)`` aliases the inset's ``plots`` to this plotter's own
+        ``_plots`` list -- the same object, not a copy -- so a plot added after ``add_inset``
+        also shows up in the inset. That identity is recorded here (``{"alias": "all"}``)
+        so :meth:`_resolve_inset_refs` can reconstruct it on load, instead of freezing a
+        snapshot of indices that would stop tracking future plots.
 
         :param inset: The inset to describe.
-        :return: ``{"plots": [<index>, ...]}``
+        :return: ``{"alias": "all"}`` if ``inset.plots is self._plots``, else
+            ``{"indices": [<index>, ...]}``.
         :raises UnserializableValue: If the inset replays an object this plotter does not own.
         """
+        if inset.plots is self._plots:
+            return {"alias": "all"}
+
         indices = []
         for plot in inset.plots:
             for index, own in enumerate(self._plots):
@@ -252,7 +272,19 @@ class GenericPlotter(BasePlotter):
                     break
             else:
                 raise UnserializableValue(plot, where="an inset plot this plotter does not own")
-        return {"plots": indices}
+        return {"indices": indices}
+
+    def _resolve_inset_refs(self, refs: dict[str, Any]) -> list[Any]:
+        """Turn the symbolic references written by :meth:`_inset_refs` back into live objects.
+
+        :param refs: One inset's reference block.
+        :return: The plot objects, in replay order. When the inset aliased this plotter's own
+            ``_plots`` list at save time, ``self._plots`` itself is returned -- not a copy --
+            so a plot appended after load still appears when the inset replays.
+        """
+        if refs.get("alias") == "all":
+            return self._plots
+        return [self._plots[index] for index in refs["indices"]]
 
     @classmethod
     def load(cls, path: str | Path) -> "GenericPlotter":
@@ -279,9 +311,7 @@ class GenericPlotter(BasePlotter):
         plotter = cls()
         decode_base_plotter(plotter, payload["base"])
         plotter._plots = [decode_generic_plot(data) for data in payload["plots"]]
-        plotter._insets = [
-            decode_inset(data, [plotter._plots[index] for index in data["plots"]["plots"]])
-            for data in payload["insets"]
-        ]
-        warn_dropped(payload.get("dropped", []))
+        plotter._insets = [decode_inset(data, plotter._resolve_inset_refs(data["plots"])) for data in payload["insets"]]
+        plotter._dropped_on_load = payload.get("dropped", [])
+        warn_dropped(plotter._dropped_on_load)
         return plotter

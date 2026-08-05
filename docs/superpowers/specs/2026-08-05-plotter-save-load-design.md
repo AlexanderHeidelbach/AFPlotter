@@ -144,7 +144,8 @@ whole plot, zoomed" would silently become a frozen copy that no longer tracks th
 
 Each inset therefore stores symbolic references — `{"histplot": true, "generic_plots": [0, 1]}` —
 resolved back to the live objects at load. An entry in `plots` that is not one of the plotter's own
-objects is unserializable and follows the refuse-or-skip rule above.
+objects always raises, on the same reasoning as an unserializable positional argument: dropping it
+would remove a curve from the inset, not a style, so `skip_unserializable` does not apply to it.
 
 The rest of `InsetPlot`'s configuration (`xlim`, `ylim`, `width`, `height`, `loc`, `borderpad`,
 `title`, `mark_region`, `mark_kwargs`, `tick_labelsize`, `title_fontsize`, `bbox_to_anchor`) is

@@ -55,6 +55,29 @@ def test_encode_value_recurses_into_containers():
     assert np.allclose(restored["data"][0], [1.0, 2.0])
 
 
+def test_encode_value_rejects_an_unserializable_numpy_scalar():
+    """np.generic.item() is not validated before finding #38's fix -- np.complex128.item()
+    returns a Python complex, which is not JSON-native and previously reached json.dumps
+    unchecked, raising a bare TypeError there instead of UnserializableValue here."""
+    with pytest.raises(UnserializableValue) as excinfo:
+        encode_value(np.complex128(1 + 2j))
+    assert "complex128" in excinfo.value.value_type
+
+
+def test_encode_value_rejects_an_unserializable_numpy_datetime_scalar():
+    with pytest.raises(UnserializableValue):
+        encode_value(np.datetime64("2024-01-01"))
+
+
+def test_encode_value_encodes_a_pathlike_savedir_as_a_string():
+    from pathlib import Path
+
+    encoded = encode_value(Path("/tmp/out"))
+    json.dumps(encoded)
+    assert encoded == "/tmp/out"
+    assert decode_value(encoded) == "/tmp/out"
+
+
 def test_encode_value_rejects_a_live_matplotlib_object():
     from matplotlib import pyplot as plt
 

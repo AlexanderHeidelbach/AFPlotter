@@ -222,7 +222,7 @@ def test_generic_plotter_save_refuses_an_unserializable_kwarg_and_writes_nothing
     plotter.add_generic_plot("plot", np.array([1.0]), transform=ax.transAxes)
 
     path = tmp_path / "p.json"
-    with pytest.raises(ValueError, match=r"_plots\[1\].*transform"):
+    with pytest.raises(ValueError, match=r"plots\[1\].*transform"):
         plotter.save(path)
     plt.close("all")
     assert not path.exists()
@@ -242,6 +242,79 @@ def test_generic_plotter_save_can_skip_and_load_warns(tmp_path):
     with pytest.warns(UserWarning, match="transform"):
         loaded = GenericPlotter.load(path)
     assert loaded._plots[0].kwargs == {"color": "red"}
+
+
+def test_generic_plotter_resave_preserves_dropped_entries(tmp_path):
+    """Before the fix, `save` only wrote the entries it dropped *this* call, so `load`'s
+    freshly-constructed plotter had no memory of what a previous save had already lost.
+    A resave-then-reload silently produced a file whose `dropped` list was empty."""
+    from matplotlib import pyplot as plt
+
+    ax = plt.subplots()[1]
+    plotter = GenericPlotter()
+    plotter.add_generic_plot("plot", np.array([1.0]), color="red", transform=ax.transAxes)
+
+    first_path = tmp_path / "first.json"
+    plotter.save(first_path, skip_unserializable=True)
+    plt.close("all")
+
+    with pytest.warns(UserWarning, match="transform"):
+        loaded = GenericPlotter.load(first_path)
+
+    second_path = tmp_path / "second.json"
+    loaded.save(second_path)
+
+    with pytest.warns(UserWarning, match="transform"):
+        GenericPlotter.load(second_path)
+
+
+def test_loaded_generic_plotter_default_inset_tracks_plots_added_after_load(tmp_path):
+    """add_inset(plots=None) aliases the inset to this plotter's own _plots list, so a
+    plot added after add_inset also shows up in the inset. Before the fix, load rebuilt
+    a fresh list for the inset, so the alias -- and this behaviour -- was lost."""
+    plotter = GenericPlotter()
+    plotter.add_generic_plot("plot", np.array([0.0, 1.0]), np.array([0.0, 1.0]), label="first")
+    plotter.add_inset(xlim=(0.0, 1.0), title="zoom")
+
+    path = tmp_path / "p.json"
+    plotter.save(path)
+    loaded = GenericPlotter.load(path)
+
+    assert loaded._insets[0].plots is loaded._plots
+
+    loaded.add_generic_plot("plot", np.array([0.0, 1.0]), np.array([1.0, 0.0]), label="second")
+    assert loaded._insets[0].plots[-1] is loaded._plots[-1]
+    assert len(loaded._insets[0].plots) == 2
+
+
+def test_generic_plotter_save_locates_an_unserializable_inset_setting(tmp_path):
+    """Before the fix, encode_inset never set error.where and the save() inset loop didn't
+    wrap it either, so the raised ValueError named `None` instead of the inset."""
+    from matplotlib import pyplot as plt
+
+    ax = plt.subplots()[1]
+    plotter = GenericPlotter()
+    plotter.add_generic_plot("plot", np.array([1.0]))
+    plotter.add_inset(xlim=(0.0, 1.0), mark_kwargs={"transform": ax.transAxes})
+
+    path = tmp_path / "p.json"
+    with pytest.raises(ValueError, match=r"_insets\[0\]"):
+        plotter.save(path)
+    plt.close("all")
+    assert not path.exists()
+
+
+def test_generic_plotter_savedir_round_trips_a_pathlib_path(tmp_path):
+    from pathlib import Path
+
+    plotter = GenericPlotter()
+    plotter.savedir = Path(tmp_path) / "out"
+
+    path = tmp_path / "p.json"
+    plotter.save(path)
+    loaded = GenericPlotter.load(path)
+
+    assert loaded.savedir == str(Path(tmp_path) / "out")
 
 
 def test_generic_plotter_load_rejects_an_unknown_format_version(tmp_path):
