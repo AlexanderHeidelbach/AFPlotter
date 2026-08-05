@@ -447,3 +447,30 @@ def test_loaded_entries_survive_being_re_added(tmp_path):
     rebuilt.add_entry(restored.entries["bkg"])
 
     assert np.allclose(rebuilt.entries["bkg"].errors, errors)
+
+
+def test_add_entry_coerces_list_valued_errors_to_an_ndarray(tmp_path):
+    """A list-valued errors must be coerced to an ndarray, not stored verbatim.
+
+    Before add_entry normalized this, a plain list survived into the stored entry:
+    len() passed the guard, the non-empty check skipped compute_errors, and downstream
+    consumers (as_binned_dict's .tolist(), get_total_bin_errors' / __iadd__'s **2) crashed
+    far from the cause. Errors here are deliberately not sqrt(counts) -- a fixture whose
+    expected value the broken code also produces would prove nothing.
+    """
+    counts = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    errors = [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert not np.allclose(errors, np.sqrt(counts))
+
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    hist.add_entry(HistogramEntry(name="pre", counts=counts, errors=errors))
+
+    stored = hist.entries["pre"].errors
+    assert isinstance(stored, np.ndarray)
+    assert np.allclose(stored, errors)
+
+    path = tmp_path / "h.json"
+    hist.save(path)
+    restored = Histogram.load(path)
+    assert np.allclose(restored.entries["pre"].errors, errors)

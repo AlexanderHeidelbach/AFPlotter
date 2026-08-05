@@ -252,6 +252,7 @@ class Histogram:
         binning = self.binning
         if isinstance(binning, int):
             raise ValueError("Binning was not resolved to an array before computing entry errors")
+        entry.errors = np.asarray(entry.errors, dtype=float)
         if len(entry.errors) not in (0, len(entry.counts)):
             raise ValueError(
                 f"Entry '{entry.name}' was given {len(entry.errors)} errors "
