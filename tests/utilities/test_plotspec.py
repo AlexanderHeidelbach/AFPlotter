@@ -60,6 +60,30 @@ def test_encode_value_rejects_a_live_matplotlib_object():
     assert "Transform" in excinfo.value.value_type
 
 
+@pytest.mark.parametrize("marker_key", ["__ndarray__", "__tuple__"])
+def test_encode_value_round_trips_a_plain_dict_with_a_marker_key_among_others(marker_key):
+    """A real dict that happens to use a marker key alongside other keys must not be
+    mistaken for a tagged ndarray/tuple -- both keys must survive the round trip."""
+    value = {marker_key: 5, "other": "stuff"}
+    encoded = encode_value(value)
+    json.dumps(encoded)
+    restored = decode_value(encoded)
+    assert restored == value
+    assert isinstance(restored, dict)
+
+
+@pytest.mark.parametrize("marker_key", ["__ndarray__", "__tuple__"])
+def test_encode_value_round_trips_a_plain_dict_whose_only_key_is_a_marker(marker_key):
+    """A single-key dict literally named after a marker must decode back to a dict,
+    not to an np.ndarray/tuple -- this is the exact collision the codec must refuse to drop."""
+    value = {marker_key: 5}
+    encoded = encode_value(value)
+    json.dumps(encoded)
+    restored = decode_value(encoded)
+    assert restored == value
+    assert isinstance(restored, dict)
+
+
 def test_encode_value_rejects_an_unserializable_value_nested_in_a_container():
     """A container must not smuggle a live object past the check."""
     from matplotlib import pyplot as plt

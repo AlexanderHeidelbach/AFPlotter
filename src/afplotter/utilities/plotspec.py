@@ -14,6 +14,8 @@ PLOT_FORMAT_VERSION = 1
 
 _NDARRAY_KEY = "__ndarray__"
 _TUPLE_KEY = "__tuple__"
+_DICT_KEY = "__dict__"
+_MARKER_KEYS = frozenset({_NDARRAY_KEY, _TUPLE_KEY, _DICT_KEY})
 
 _JSON_NATIVE = (str, bool, int, float, type(None))
 
@@ -36,7 +38,10 @@ def encode_value(value: Any) -> Any:
     """Convert a value to JSON-safe data.
 
     ``np.ndarray`` and ``tuple`` are tagged so they survive the round trip as themselves;
-    JSON natives pass through; lists and dicts are encoded element-wise.
+    JSON natives pass through; lists and dicts are encoded element-wise. A plain dict whose
+    encoded form would collide with one of these markers -- i.e. it has exactly one key equal
+    to ``"__ndarray__"``, ``"__tuple__"`` or ``"__dict__"`` -- is itself wrapped in a
+    ``"__dict__"`` marker, so :func:`decode_value` can tell it apart from an actual tagged value.
 
     :param value: The value to encode.
     :return: JSON-safe data.
@@ -54,7 +59,10 @@ def encode_value(value: Any) -> Any:
     if isinstance(value, dict):
         if any(not isinstance(key, str) for key in value):
             raise UnserializableValue(value)
-        return {key: encode_value(item) for key, item in value.items()}
+        encoded = {key: encode_value(item) for key, item in value.items()}
+        if len(encoded) == 1 and next(iter(encoded)) in _MARKER_KEYS:
+            return {_DICT_KEY: encoded}
+        return encoded
     if isinstance(value, _JSON_NATIVE):
         return value
     raise UnserializableValue(value)
@@ -67,10 +75,14 @@ def decode_value(data: Any) -> Any:
     :return: The restored value.
     """
     if isinstance(data, dict):
-        if _NDARRAY_KEY in data:
-            return np.array(data[_NDARRAY_KEY])
-        if _TUPLE_KEY in data:
-            return tuple(decode_value(item) for item in data[_TUPLE_KEY])
+        if len(data) == 1:
+            (key,) = data
+            if key == _NDARRAY_KEY:
+                return np.array(data[_NDARRAY_KEY])
+            if key == _TUPLE_KEY:
+                return tuple(decode_value(item) for item in data[_TUPLE_KEY])
+            if key == _DICT_KEY:
+                return {inner_key: decode_value(item) for inner_key, item in data[_DICT_KEY].items()}
         return {key: decode_value(item) for key, item in data.items()}
     if isinstance(data, list):
         return [decode_value(item) for item in data]
