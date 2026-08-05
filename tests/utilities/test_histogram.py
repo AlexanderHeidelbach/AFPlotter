@@ -181,14 +181,11 @@ def test_histogram_roundtrip_preserves_unset_binning():
 def test_save_load_round_trip(tmp_path):
     """Counts, errors, binning, signal split and styling must survive a save/load cycle.
 
-    ``add_entry`` calls ``compute_errors`` on any entry with ``array is None``, which sets
-    ``errors = sqrt(counts)`` -- so passing the intended (deliberately-not-sqrt(counts))
-    errors into the ``HistogramEntry`` constructor would be silently overwritten before
-    ``save`` ever runs. The intended errors are therefore assigned directly to the
-    histogram's entries *after* ``add_entry`` returns, and asserted against those literal
-    values rather than against a fresh ``get_bin_errors()``/``.errors`` call on ``hist`` --
-    a ``load`` that recomputes errors instead of restoring them must fail this test.
+    The errors here are deliberately not ``sqrt(counts)``, so a ``load`` that recomputes
+    them instead of restoring them fails this test. They are passed straight into the
+    ``HistogramEntry`` constructor -- ``add_entry`` preserves supplied errors (issue #37).
     """
+    bkg_errors = np.array([1.5, 2.5, 3.5, 4.5, 5.5])
     hist = Histogram()
     hist.binning = np.linspace(0.0, 5.0, 6)
     hist.add_entry(
@@ -196,25 +193,24 @@ def test_save_load_round_trip(tmp_path):
             name="bkg",
             latex_name="Background",
             counts=np.array([10.0, 20.0, 30.0, 40.0, 50.0]),
+            errors=bkg_errors,
             color="#123456",
             hatch="//",
             weight=2.0,
             show_label=False,
         )
     )
-    bkg_errors = np.array([1.5, 2.5, 3.5, 4.5, 5.5])
-    hist.entries["bkg"].errors = bkg_errors
 
+    sig_errors = np.array([0.5, 0.5, 0.5, 0.5, 0.5])
     hist.add_entry(
         HistogramEntry(
             name="sig",
             latex_name="Signal",
             counts=np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
+            errors=sig_errors,
             type="signal",
         )
     )
-    sig_errors = np.array([0.5, 0.5, 0.5, 0.5, 0.5])
-    hist.signal["sig"].errors = sig_errors
 
     hist.metadata["column_name"] = "pt"
 
@@ -333,3 +329,148 @@ def test_load_rejects_a_payload_missing_entries(tmp_path):
 
     with pytest.raises(ValueError, match="entries"):
         Histogram.load(path)
+
+
+def test_add_entry_preserves_supplied_errors_on_a_prebinned_entry():
+    """Issue #37: pre-binned errors are authoritative and must not be recomputed."""
+    counts = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    errors = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+    # Guard the fixture: if these coincided with sqrt(counts) the test would pass
+    # whether errors were preserved or overwritten.
+    assert not np.allclose(errors, np.sqrt(counts))
+
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    hist.add_entry(HistogramEntry(name="pre", counts=counts, errors=errors))
+
+    assert np.allclose(hist.entries["pre"].errors, errors)
+
+
+def test_add_entry_falls_back_to_poisson_when_no_errors_supplied():
+    """The sqrt(counts) fallback is load-bearing for pre-binned entries without errors."""
+    counts = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    hist.add_entry(HistogramEntry(name="pre", counts=counts))
+
+    assert np.allclose(hist.entries["pre"].errors, np.sqrt(counts))
+
+
+def test_add_entry_computes_weighted_errors_from_a_raw_array():
+    """With a raw array and no supplied errors, errors stay sqrt(sum w**2), not sqrt(counts)."""
+    hist = Histogram()
+    hist.binning = np.array([0.0, 1.0, 2.0])
+    # Four events in bin 0, two in bin 1, each weighted 2.0.
+    array = np.array([0.5, 0.5, 0.5, 0.5, 1.5, 1.5])
+    hist.add_entry(HistogramEntry(name="w", array=array, weight=2.0))
+
+    counts = hist.entries["w"].counts
+    errors = hist.entries["w"].errors
+    assert np.allclose(counts, [8.0, 4.0])
+    assert np.allclose(errors, [4.0, np.sqrt(8.0)])  # sqrt(sum w**2) = sqrt(4*4), sqrt(2*4)
+    # The whole point of the weighted path: it does not agree with Poisson.
+    assert not np.allclose(errors, np.sqrt(counts))
+
+
+def test_add_entry_supplied_errors_win_over_a_raw_array():
+    """Precedence: supplied binned values are never recomputed, exactly as counts behave.
+
+    This entry carries both a raw ``array`` and explicit ``errors``. The supplied errors
+    win. Pinning this is the point of the test -- it is what fails if someone later
+    switches to the 'recompute whenever array exists' reading.
+    """
+    array = np.array([0.5, 0.5, 0.5, 0.5, 1.5, 1.5])
+    counts = np.array([4.0, 2.0])
+    errors = np.array([0.25, 0.75])
+    assert not np.allclose(errors, np.sqrt(counts))
+
+    hist = Histogram()
+    hist.binning = np.array([0.0, 1.0, 2.0])
+    hist.add_entry(HistogramEntry(name="both", array=array, counts=counts, errors=errors))
+
+    assert np.allclose(hist.entries["both"].errors, errors)
+
+
+def test_add_entry_rejects_errors_of_the_wrong_length():
+    """A mismatched errors array is a caller bug; fail here, not deep inside plotting."""
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    entry = HistogramEntry(
+        name="pre",
+        counts=np.array([10.0, 20.0, 30.0, 40.0, 50.0]),
+        errors=np.array([1.0, 1.0, 1.0]),
+    )
+
+    with pytest.raises(ValueError, match=r"'pre'.*3 errors.*5 counts"):
+        hist.add_entry(entry)
+
+
+def test_sum_entries_keeps_the_propagated_errors():
+    """Issue #37: __iadd__ quadrature-sums errors; add_entry must not replace them.
+
+    Both inputs are pre-binned with errors that are not sqrt(counts), so the correct
+    result -- sqrt(a**2 + b**2) -- differs from the sqrt(total counts) the broken code
+    produced.
+    """
+    hist = Histogram()
+    hist.binning = np.array([0.0, 1.0, 2.0])
+    hist.add_entry(HistogramEntry(name="a", counts=np.array([4.0, 9.0]), errors=np.array([3.0, 4.0])))
+    hist.add_entry(HistogramEntry(name="b", counts=np.array([12.0, 7.0]), errors=np.array([4.0, 3.0])))
+
+    hist.sum_entries(["a", "b"], name="combined")
+
+    combined = hist.entries["combined"]
+    expected = np.array([5.0, 5.0])  # sqrt(3**2 + 4**2), sqrt(4**2 + 3**2)
+    assert np.allclose(combined.counts, [16.0, 16.0])
+    # The broken behaviour returned sqrt(16) == 4.0 per bin; the correct answer is 5.0.
+    assert not np.allclose(expected, np.sqrt(combined.counts))
+    assert np.allclose(combined.errors, expected)
+
+
+def test_loaded_entries_survive_being_re_added(tmp_path):
+    """Issue #37: Histogram.load restores authoritative errors; re-adding must not corrupt them."""
+    counts = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    errors = np.array([1.5, 2.5, 3.5, 4.5, 5.5])
+    assert not np.allclose(errors, np.sqrt(counts))
+
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    hist.add_entry(HistogramEntry(name="bkg", counts=counts, errors=errors))
+
+    path = tmp_path / "h.json"
+    hist.save(path)
+    restored = Histogram.load(path)
+
+    rebuilt = Histogram()
+    rebuilt.binning = restored.binning
+    rebuilt.add_entry(restored.entries["bkg"])
+
+    assert np.allclose(rebuilt.entries["bkg"].errors, errors)
+
+
+def test_add_entry_coerces_list_valued_errors_to_an_ndarray(tmp_path):
+    """A list-valued errors must be coerced to an ndarray, not stored verbatim.
+
+    Before add_entry normalized this, a plain list survived into the stored entry:
+    len() passed the guard, the non-empty check skipped compute_errors, and downstream
+    consumers (as_binned_dict's .tolist(), get_total_bin_errors' / __iadd__'s **2) crashed
+    far from the cause. Errors here are deliberately not sqrt(counts) -- a fixture whose
+    expected value the broken code also produces would prove nothing.
+    """
+    counts = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    errors = [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert not np.allclose(errors, np.sqrt(counts))
+
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    hist.add_entry(HistogramEntry(name="pre", counts=counts, errors=errors))
+
+    stored = hist.entries["pre"].errors
+    assert isinstance(stored, np.ndarray)
+    assert np.allclose(stored, errors)
+
+    path = tmp_path / "h.json"
+    hist.save(path)
+    restored = Histogram.load(path)
+    assert np.allclose(restored.entries["pre"].errors, errors)
