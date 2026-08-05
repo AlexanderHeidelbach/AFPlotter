@@ -193,13 +193,6 @@ class Histogram:
         The returned histogram has no raw event data: ``get_data()`` yields ``None`` for
         every entry.
 
-        .. warning::
-            Returned entries are binned-only; their stored ``errors`` are authoritative for
-            a weighted sample (``sqrt(sum(w**2))``), not necessarily ``sqrt(counts)``. Passing
-            such an entry back through :meth:`add_entry` recomputes ``errors`` from ``counts``
-            (since ``array`` is ``None``) and silently overwrites the restored value with the
-            wrong number. Not fixed here — tracked as issue #37.
-
         :param path: Path to a JSON file written by :meth:`save`.
         :return: The reconstructed histogram.
         :raises ValueError: If the file's ``format_version`` is not supported, or the file's
@@ -235,6 +228,19 @@ class Histogram:
         return self.metadata.get("filters", [])
 
     def add_entry(self, entry: HistogramEntry, clear: bool = False) -> None:
+        """Bin an entry and store it under its name.
+
+        Values the caller supplies are authoritative and are never recomputed: ``counts``
+        are binned from ``array`` only when empty, and ``errors`` likewise. An entry with
+        no ``errors`` gets ``sqrt(sum(w**2))`` when it carries a raw ``array``, and the
+        Poisson ``sqrt(counts)`` when it is pre-binned.
+
+        :param entry: The entry to add. Dispatched to ``self.entries`` or ``self.signal``
+            on its ``type``.
+        :param clear: Drop the entry's raw ``array`` after binning.
+        :raises ValueError: If the binning is unset or unresolved, if supplied ``errors``
+            do not have one value per bin, or if ``entry.type`` is unrecognised.
+        """
         if self.binning is None:
             raise ValueError("Binning not set")
 

@@ -181,14 +181,11 @@ def test_histogram_roundtrip_preserves_unset_binning():
 def test_save_load_round_trip(tmp_path):
     """Counts, errors, binning, signal split and styling must survive a save/load cycle.
 
-    ``add_entry`` calls ``compute_errors`` on any entry with ``array is None``, which sets
-    ``errors = sqrt(counts)`` -- so passing the intended (deliberately-not-sqrt(counts))
-    errors into the ``HistogramEntry`` constructor would be silently overwritten before
-    ``save`` ever runs. The intended errors are therefore assigned directly to the
-    histogram's entries *after* ``add_entry`` returns, and asserted against those literal
-    values rather than against a fresh ``get_bin_errors()``/``.errors`` call on ``hist`` --
-    a ``load`` that recomputes errors instead of restoring them must fail this test.
+    The errors here are deliberately not ``sqrt(counts)``, so a ``load`` that recomputes
+    them instead of restoring them fails this test. They are passed straight into the
+    ``HistogramEntry`` constructor -- ``add_entry`` preserves supplied errors (issue #37).
     """
+    bkg_errors = np.array([1.5, 2.5, 3.5, 4.5, 5.5])
     hist = Histogram()
     hist.binning = np.linspace(0.0, 5.0, 6)
     hist.add_entry(
@@ -196,25 +193,24 @@ def test_save_load_round_trip(tmp_path):
             name="bkg",
             latex_name="Background",
             counts=np.array([10.0, 20.0, 30.0, 40.0, 50.0]),
+            errors=bkg_errors,
             color="#123456",
             hatch="//",
             weight=2.0,
             show_label=False,
         )
     )
-    bkg_errors = np.array([1.5, 2.5, 3.5, 4.5, 5.5])
-    hist.entries["bkg"].errors = bkg_errors
 
+    sig_errors = np.array([0.5, 0.5, 0.5, 0.5, 0.5])
     hist.add_entry(
         HistogramEntry(
             name="sig",
             latex_name="Signal",
             counts=np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
+            errors=sig_errors,
             type="signal",
         )
     )
-    sig_errors = np.array([0.5, 0.5, 0.5, 0.5, 0.5])
-    hist.signal["sig"].errors = sig_errors
 
     hist.metadata["column_name"] = "pt"
 
@@ -408,3 +404,46 @@ def test_add_entry_rejects_errors_of_the_wrong_length():
 
     with pytest.raises(ValueError, match=r"'pre'.*3 errors.*5 counts"):
         hist.add_entry(entry)
+
+
+def test_sum_entries_keeps_the_propagated_errors():
+    """Issue #37: __iadd__ quadrature-sums errors; add_entry must not replace them.
+
+    Both inputs are pre-binned with errors that are not sqrt(counts), so the correct
+    result -- sqrt(a**2 + b**2) -- differs from the sqrt(total counts) the broken code
+    produced.
+    """
+    hist = Histogram()
+    hist.binning = np.array([0.0, 1.0, 2.0])
+    hist.add_entry(HistogramEntry(name="a", counts=np.array([4.0, 9.0]), errors=np.array([3.0, 4.0])))
+    hist.add_entry(HistogramEntry(name="b", counts=np.array([12.0, 7.0]), errors=np.array([4.0, 3.0])))
+
+    hist.sum_entries(["a", "b"], name="combined")
+
+    combined = hist.entries["combined"]
+    expected = np.array([5.0, 5.0])  # sqrt(3**2 + 4**2), sqrt(4**2 + 3**2)
+    assert np.allclose(combined.counts, [16.0, 16.0])
+    # The broken behaviour returned sqrt(16) == 4.0 per bin; the correct answer is 5.0.
+    assert not np.allclose(expected, np.sqrt(combined.counts))
+    assert np.allclose(combined.errors, expected)
+
+
+def test_loaded_entries_survive_being_re_added(tmp_path):
+    """Issue #37: Histogram.load restores authoritative errors; re-adding must not corrupt them."""
+    counts = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    errors = np.array([1.5, 2.5, 3.5, 4.5, 5.5])
+    assert not np.allclose(errors, np.sqrt(counts))
+
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    hist.add_entry(HistogramEntry(name="bkg", counts=counts, errors=errors))
+
+    path = tmp_path / "h.json"
+    hist.save(path)
+    restored = Histogram.load(path)
+
+    rebuilt = Histogram()
+    rebuilt.binning = restored.binning
+    rebuilt.add_entry(restored.entries["bkg"])
+
+    assert np.allclose(rebuilt.entries["bkg"].errors, errors)
