@@ -230,7 +230,7 @@ class GenericPlotter(BasePlotter):
                 try:
                     insets.append(encode_inset(inset, self._inset_refs(inset)))
                 except UnserializableValue as error:
-                    error.where = f"_insets[{index}]: {error.where or 'settings'}"
+                    error.where = f"insets[{index}]: {error.where}"
                     raise
         except UnserializableValue as error:
             raise ValueError(

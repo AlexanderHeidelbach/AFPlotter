@@ -58,7 +58,10 @@ def encode_value(value: Any) -> Any:
             return item
         raise UnserializableValue(value)
     if isinstance(value, os.PathLike):
-        return os.fspath(value)
+        path = os.fspath(value)
+        if isinstance(path, str):
+            return path
+        raise UnserializableValue(value)
     if isinstance(value, tuple):
         return {_TUPLE_KEY: [encode_value(item) for item in value]}
     if isinstance(value, list):

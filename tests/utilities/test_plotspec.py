@@ -78,6 +78,21 @@ def test_encode_value_encodes_a_pathlike_savedir_as_a_string():
     assert decode_value(encoded) == "/tmp/out"
 
 
+def test_encode_value_rejects_a_pathlike_whose_fspath_returns_bytes():
+    """`os.fspath` returns `bytes` for a bytes-flavoured PathLike. Before the fix, that value
+    was returned unvalidated and only failed later inside `json.dumps` with a bare TypeError
+    that `save`'s `except UnserializableValue` does not catch -- rejecting it here, instead,
+    is the point; a bytes path is never expected to round-trip."""
+
+    class BytesPath:
+        def __fspath__(self) -> bytes:
+            return b"/tmp/out"
+
+    with pytest.raises(UnserializableValue) as excinfo:
+        encode_value(BytesPath())
+    assert "BytesPath" in excinfo.value.value_type
+
+
 def test_encode_value_rejects_a_live_matplotlib_object():
     from matplotlib import pyplot as plt
 

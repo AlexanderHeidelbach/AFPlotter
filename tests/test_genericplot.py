@@ -289,7 +289,10 @@ def test_loaded_generic_plotter_default_inset_tracks_plots_added_after_load(tmp_
 
 def test_generic_plotter_save_locates_an_unserializable_inset_setting(tmp_path):
     """Before the fix, encode_inset never set error.where and the save() inset loop didn't
-    wrap it either, so the raised ValueError named `None` instead of the inset."""
+    wrap it either, so the raised ValueError named `None` instead of the inset. The refusal
+    message must also name insets the same way it names plots -- `insets[0]`, not the
+    private `_insets[0]` -- so this checks the exact unprefixed location, not merely that
+    `insets[0]` occurs as a substring of `_insets[0]`."""
     from matplotlib import pyplot as plt
 
     ax = plt.subplots()[1]
@@ -298,7 +301,7 @@ def test_generic_plotter_save_locates_an_unserializable_inset_setting(tmp_path):
     plotter.add_inset(xlim=(0.0, 1.0), mark_kwargs={"transform": ax.transAxes})
 
     path = tmp_path / "p.json"
-    with pytest.raises(ValueError, match=r"_insets\[0\]"):
+    with pytest.raises(ValueError, match=r"(?<!_)insets\[0\]"):
         plotter.save(path)
     plt.close("all")
     assert not path.exists()

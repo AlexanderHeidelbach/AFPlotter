@@ -518,6 +518,28 @@ def test_histogram_plotter_save_load_round_trips_pull_plots(tmp_path, synthetic_
     assert loaded.pull_ylim == plotter.pull_ylim
 
 
+def test_histogram_plotter_resave_preserves_dropped_entries(tmp_path, synthetic_histogram):
+    """Mirrors GenericPlotter's equivalent test: `save` only records what *this* call
+    dropped, so a plotter loaded from a `skip_unserializable=True` save must carry that
+    memory forward into `_dropped_on_load`, or a resave-then-reload silently loses it."""
+    ax = plt.subplots()[1]
+    plotter = _histogram_plotter(synthetic_histogram)
+    plotter.add_generic_plot(GenericPlot("plot", np.array([1.0]), transform=ax.transAxes))
+
+    first_path = tmp_path / "first.json"
+    plotter.save(first_path, skip_unserializable=True)
+    plt.close("all")
+
+    with pytest.warns(UserWarning, match="transform"):
+        loaded = HistogramPlotter.load(first_path)
+
+    second_path = tmp_path / "second.json"
+    loaded.save(second_path)
+
+    with pytest.warns(UserWarning, match="transform"):
+        HistogramPlotter.load(second_path)
+
+
 def test_histogram_plotter_inset_references_the_loaded_objects(tmp_path, synthetic_histogram):
     plotter = _histogram_plotter(synthetic_histogram)
     plotter.add_generic_plot(GenericPlot("plot", np.array([1.0, 2.0]), np.array([3.0, 4.0])))
@@ -619,6 +641,30 @@ def test_histogram_2d_plotter_save_load_round_trips_the_spec(tmp_path):
     # The data came from the caller, not the file.
     assert loaded.histplot.xhistogram is fresh_x
     assert loaded.histplot.yhistogram is fresh_y
+
+
+def test_histogram_2d_plotter_resave_preserves_dropped_entries(tmp_path):
+    """Mirrors GenericPlotter's equivalent test: `save` only records what *this* call
+    dropped, so a plotter loaded from a `skip_unserializable=True` save must carry that
+    memory forward into `_dropped_on_load`, or a resave-then-reload silently loses it."""
+    ax = plt.subplots()[1]
+    xhist, yhist = _2d_histograms()
+    plotter = Histogram2DPlotter(Histogram2DPlot(xhist, yhist), HistogramVariable("mass"), HistogramVariable("time"))
+    plotter.add_generic_plot(GenericPlot("plot", np.array([1.0]), transform=ax.transAxes))
+
+    first_path = tmp_path / "first.json"
+    plotter.save(first_path, skip_unserializable=True)
+    plt.close("all")
+
+    fresh_x, fresh_y = _2d_histograms()
+    with pytest.warns(UserWarning, match="transform"):
+        loaded = Histogram2DPlotter.load(first_path, xhistogram=fresh_x, yhistogram=fresh_y)
+
+    second_path = tmp_path / "second.json"
+    loaded.save(second_path)
+
+    with pytest.warns(UserWarning, match="transform"):
+        Histogram2DPlotter.load(second_path, xhistogram=fresh_x, yhistogram=fresh_y)
 
 
 def test_histogram_2d_plotter_save_does_not_embed_event_data(tmp_path):
