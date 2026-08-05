@@ -1,9 +1,22 @@
+import json
+from pathlib import Path
 from typing import Any
 
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 
 from afplotter.baseplotter import BasePlotter
+from afplotter.utilities.plotspec import (
+    PLOT_FORMAT_VERSION,
+    UnserializableValue,
+    decode_base_plotter,
+    decode_generic_plot,
+    decode_inset,
+    encode_base_plotter,
+    encode_generic_plot,
+    encode_inset,
+    warn_dropped,
+)
 
 
 class GenericPlot:
@@ -181,3 +194,94 @@ class GenericPlotter(BasePlotter):
             plt.show()
 
         return ax
+
+    def save(self, path: str | Path, skip_unserializable: bool = False) -> None:
+        """Write this plotter's specification to a JSON file.
+
+        The saved file holds the plot's *specification*: styling, limits, text, and every
+        queued overlay's method name, arguments and keyword arguments. Overlays added via
+        a model function were already evaluated into sampled arrays when they were added,
+        so a loaded plot re-renders them at that sampled resolution -- it cannot
+        re-evaluate the model at a different binning.
+
+        :param path: Destination file path. Any parent directory must already exist.
+        :param skip_unserializable: Drop keyword arguments that cannot be saved, recording
+            them in the file so :meth:`load` can warn. Positional arguments are never
+            dropped.
+        :raises ValueError: If any value cannot be saved and ``skip_unserializable`` is
+            false. Nothing is written in that case.
+        :return: None
+        """
+        dropped: list[str] = []
+        try:
+            base = encode_base_plotter(self)
+            plots = []
+            for index, plot in enumerate(self._plots):
+                try:
+                    data, plot_dropped = encode_generic_plot(plot, skip_unserializable=skip_unserializable)
+                except UnserializableValue as error:
+                    error.where = f"_plots[{index}]: {error.where}"
+                    raise
+                plots.append(data)
+                dropped.extend(f"_plots[{index}]: {item}" for item in plot_dropped)
+            insets = [encode_inset(inset, self._inset_refs(inset)) for inset in self._insets]
+        except UnserializableValue as error:
+            raise ValueError(f"Cannot save this plotter: {error.where} holds {error.value_repr}") from error
+
+        payload = {
+            "format_version": PLOT_FORMAT_VERSION,
+            "base": base,
+            "plots": plots,
+            "insets": insets,
+            "dropped": dropped,
+        }
+        Path(path).write_text(json.dumps(payload))
+
+    def _inset_refs(self, inset: InsetPlot) -> dict[str, Any]:
+        """Describe an inset's plots as indices into ``self._plots``.
+
+        :param inset: The inset to describe.
+        :return: ``{"plots": [<index>, ...]}``
+        :raises UnserializableValue: If the inset replays an object this plotter does not own.
+        """
+        indices = []
+        for plot in inset.plots:
+            for index, own in enumerate(self._plots):
+                if plot is own:
+                    indices.append(index)
+                    break
+            else:
+                raise UnserializableValue(plot, where="an inset plot this plotter does not own")
+        return {"plots": indices}
+
+    @classmethod
+    def load(cls, path: str | Path) -> "GenericPlotter":
+        """Read a plotter written by :meth:`save`.
+
+        :param path: Path to a JSON file written by :meth:`save`.
+        :return: An editable plotter: adjust limits, add overlays, call ``plot()``.
+        :raises ValueError: If the file's ``format_version`` is unsupported, its top-level
+            JSON is not an object, or a required key is missing.
+        """
+        payload = json.loads(Path(path).read_text())
+        if not isinstance(payload, dict):
+            raise ValueError(f"Malformed plot file {path}: expected a JSON object at the top level.")
+        version = payload.get("format_version")
+        if version != PLOT_FORMAT_VERSION:
+            raise ValueError(
+                f"Unsupported format_version {version!r} in {path}; "
+                f"this version of AFPlotter writes and reads format_version {PLOT_FORMAT_VERSION}."
+            )
+        for key in ("base", "plots", "insets"):
+            if key not in payload:
+                raise ValueError(f"Malformed plot file {path}: missing required key {key!r}.")
+
+        plotter = cls()
+        decode_base_plotter(plotter, payload["base"])
+        plotter._plots = [decode_generic_plot(data) for data in payload["plots"]]
+        plotter._insets = [
+            decode_inset(data, [plotter._plots[index] for index in data["plots"]["plots"]])
+            for data in payload["insets"]
+        ]
+        warn_dropped(payload.get("dropped", []))
+        return plotter

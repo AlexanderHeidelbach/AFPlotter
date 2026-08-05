@@ -5,6 +5,7 @@ It knows nothing about plotters themselves -- each plotter's ``save``/``load`` w
 own attributes through these helpers.
 """
 
+import warnings
 from typing import Any
 
 import numpy as np
@@ -181,3 +182,88 @@ def decode_inset(data: dict[str, Any], resolved_plots: list[Any]) -> Any:
 
     settings = {field: decode_value(data[field]) for field in _INSET_FIELDS}
     return InsetPlot(plots=resolved_plots, **settings)
+
+
+BASE_PLOTTER_FIELDS = (
+    "figsize",
+    "label",
+    "xlabel",
+    "ylabel",
+    "watermark",
+    "luminosity_value",
+    "luminosity_unit",
+    "log",
+    "xlog",
+    "legend_max_rows",
+    "legend_title",
+    "legend_loc",
+    "xlim",
+    "ylim",
+    "savedir",
+    "saveformat",
+    "savename",
+    "savepath",
+    "watermark_position",
+    "text",
+    "generic_text",
+)
+"""Every :class:`~afplotter.baseplotter.BasePlotter` attribute a saved plot carries.
+
+Hardcoded rather than scraped from ``vars()``: a hardcoded list fails loudly when someone
+adds a property and forgets it here, whereas scraping would silently start persisting
+private state -- including live matplotlib objects.
+"""
+
+
+def _field_attribute(plotter: Any, field: str) -> str:
+    """Return the attribute name backing ``field`` -- the private one where it exists."""
+    private = f"_{field}"
+    return private if hasattr(plotter, private) else field
+
+
+def encode_base_plotter(plotter: Any) -> dict[str, Any]:
+    """Encode the shared :class:`~afplotter.baseplotter.BasePlotter` attribute block.
+
+    :param plotter: Any plotter deriving from ``BasePlotter``.
+    :return: JSON-safe data.
+    :raises UnserializableValue: If any field holds a value with no representation.
+    """
+    data = {}
+    for field in BASE_PLOTTER_FIELDS:
+        try:
+            data[field] = encode_value(getattr(plotter, _field_attribute(plotter, field)))
+        except UnserializableValue as error:
+            error.where = error.where or f"{field}"
+            raise
+    return data
+
+
+def decode_base_plotter(plotter: Any, data: dict[str, Any]) -> None:
+    """Restore the shared attribute block onto ``plotter``, in place.
+
+    Values are written to the *private* attributes: ``HistogramPlotter`` and
+    ``Histogram2DPlotter`` override ``xlabel``/``ylabel`` as read-only properties, so
+    assigning through the public name would raise.
+
+    :param plotter: The plotter to populate.
+    :param data: The block written by :func:`encode_base_plotter`.
+    :return: None
+    """
+    for field in BASE_PLOTTER_FIELDS:
+        if field in data:
+            setattr(plotter, _field_attribute(plotter, field), decode_value(data[field]))
+
+
+def warn_dropped(dropped: list[str]) -> None:
+    """Emit one ``UserWarning`` naming everything a ``save`` dropped, if anything was.
+
+    :param dropped: Descriptors recorded in the file's ``"dropped"`` list.
+    :return: None
+    """
+    if dropped:
+        warnings.warn(
+            f"This plot was saved with skip_unserializable=True; {len(dropped)} element(s) "
+            f"were dropped and are missing from the loaded plot: {', '.join(dropped)}",
+            UserWarning,
+            stacklevel=2,
+        )
