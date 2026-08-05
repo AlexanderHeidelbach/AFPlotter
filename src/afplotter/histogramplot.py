@@ -1,4 +1,6 @@
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 from matplotlib import pyplot as plt  # type: ignore
 import numpy as np  # type: ignore
@@ -7,6 +9,43 @@ from afplotter.baseplotter import BasePlotter
 from afplotter.palettes import get_palette
 from afplotter.genericplot import GenericPlot, InsetPlot
 from afplotter.utilities.histogram import Histogram
+from afplotter.utilities.plotspec import (
+    PLOT_FORMAT_VERSION,
+    UnserializableValue,
+    decode_base_plotter,
+    decode_generic_plot,
+    decode_inset,
+    decode_value,
+    encode_base_plotter,
+    encode_generic_plot,
+    encode_inset,
+    encode_value,
+    warn_dropped,
+)
+
+
+def _binned_histogram_payload(histogram: Histogram) -> dict[str, Any]:
+    """Build the embedded, binned-only payload for a histogram.
+
+    Mirrors :meth:`Histogram.save`'s payload without writing a file, and without
+    materializing any entry's raw ``array``.
+
+    :param histogram: The histogram to encode.
+    :return: JSON-safe data accepted by :meth:`Histogram.from_dict`.
+    """
+    binning = (
+        histogram.binning
+        if isinstance(histogram.binning, int)
+        else histogram.binning.tolist()
+        if histogram.binning is not None
+        else None
+    )
+    return {
+        "binning": binning,
+        "metadata": histogram.metadata,
+        "entries": {name: entry.as_binned_dict() for name, entry in histogram.entries.items()},
+        "signal": {name: entry.as_binned_dict() for name, entry in histogram.signal.items()},
+    }
 
 
 def poisson_ratio(b: np.ndarray, a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -865,6 +904,153 @@ class HistogramPlotter(BasePlotter):
             plt.show()
 
         return ax, ax_diff
+
+    def save(self, path: str | Path, skip_unserializable: bool = False) -> None:
+        """Write this plotter's specification and its binned data to a JSON file.
+
+        The histogram is embedded without its raw event arrays, so the file stays small
+        regardless of sample size. Overlays added through :meth:`add_function` or
+        :meth:`add_pull` were evaluated into sampled arrays when they were added, so a
+        loaded plot re-renders them at that resolution; it cannot re-evaluate the model
+        at a different binning.
+
+        :param path: Destination file path. Any parent directory must already exist.
+        :param skip_unserializable: Drop keyword arguments that cannot be saved, recording
+            them in the file so :meth:`load` can warn. Positional arguments are never
+            dropped.
+        :raises ValueError: If any value cannot be saved and ``skip_unserializable`` is
+            false. Nothing is written in that case.
+        :return: None
+        """
+        dropped: list[str] = []
+
+        def encode_plots(plots: list[GenericPlot], label: str) -> list[dict[str, Any]]:
+            encoded = []
+            for index, plot in enumerate(plots):
+                try:
+                    data, plot_dropped = encode_generic_plot(plot, skip_unserializable=skip_unserializable)
+                except UnserializableValue as error:
+                    error.where = f"{label}[{index}]: {error.where}"
+                    raise
+                encoded.append(data)
+                dropped.extend(f"{label}[{index}]: {item}" for item in plot_dropped)
+            return encoded
+
+        try:
+            base = encode_base_plotter(self)
+            generic_plots = encode_plots(self.generic_plots, "generic_plots")
+            pull_plots = encode_plots(self.pull_plots, "pull_plots")
+            insets = [encode_inset(inset, self._inset_refs(inset)) for inset in self._insets]
+            histplot = {
+                "stacked": self.histplot.stacked,
+                "sig_extra": self.histplot.sig_extra,
+                "uncertainty": self.histplot.uncertainty,
+                "data_only": self.histplot.data_only,
+                "density": self.histplot.density,
+                "log": self.histplot.log,
+                "linewidth": self.histplot.linewidth,
+                "edgecolor": self.histplot.edgecolor,
+            }
+            spec = {
+                "variable": {"name": self.variable.name, "unit": self.variable.unit},
+                "pull_ylim": encode_value(self.pull_ylim),
+                "pull_label": self.pull_label,
+                "color_map_kwargs": encode_value(self.color_map_kwargs),
+            }
+        except UnserializableValue as error:
+            raise ValueError(f"Cannot save this plotter: {error.where} holds {error.value_repr}") from error
+
+        payload = {
+            "format_version": PLOT_FORMAT_VERSION,
+            "base": base,
+            "spec": spec,
+            "histplot": histplot,
+            "histogram": _binned_histogram_payload(self.histplot.histogram),
+            "data_histogram": (
+                _binned_histogram_payload(self.histplot.data_hist) if self.histplot.data_hist is not None else None
+            ),
+            "generic_plots": generic_plots,
+            "pull_plots": pull_plots,
+            "insets": insets,
+            "dropped": dropped,
+        }
+        Path(path).write_text(json.dumps(payload))
+
+    def _inset_refs(self, inset: InsetPlot) -> dict[str, Any]:
+        """Describe an inset's plots symbolically: this plotter's histplot and/or its overlays.
+
+        :param inset: The inset to describe.
+        :return: ``{"order": [<kind>, <index>], ...]}`` in replay order.
+        :raises UnserializableValue: If the inset replays an object this plotter does not own.
+        """
+        refs: dict[str, Any] = {"order": []}
+        for plot in inset.plots:
+            if plot is self.histplot:
+                refs["order"].append(["histplot", 0])
+                continue
+            for index, own in enumerate(self.generic_plots):
+                if plot is own:
+                    refs["order"].append(["generic_plots", index])
+                    break
+            else:
+                raise UnserializableValue(plot, where="an inset plot this plotter does not own")
+        return refs
+
+    @classmethod
+    def load(cls, path: str | Path) -> "HistogramPlotter":
+        """Read a plotter written by :meth:`save`.
+
+        The restored histogram carries no raw event data, so the plotter cannot be used to
+        build a 2D plot -- see :class:`Histogram2DPlot`.
+
+        :param path: Path to a JSON file written by :meth:`save`.
+        :return: An editable plotter: adjust limits, add overlays, call ``plot()``.
+        :raises ValueError: If the file's ``format_version`` is unsupported, its top-level
+            JSON is not an object, or a required key is missing.
+        """
+        payload = json.loads(Path(path).read_text())
+        if not isinstance(payload, dict):
+            raise ValueError(f"Malformed plot file {path}: expected a JSON object at the top level.")
+        version = payload.get("format_version")
+        if version != PLOT_FORMAT_VERSION:
+            raise ValueError(
+                f"Unsupported format_version {version!r} in {path}; "
+                f"this version of AFPlotter writes and reads format_version {PLOT_FORMAT_VERSION}."
+            )
+        for key in ("base", "spec", "histplot", "histogram"):
+            if key not in payload:
+                raise ValueError(f"Malformed plot file {path}: missing required key {key!r}.")
+
+        histplot = HistogramPlot(Histogram.from_dict(payload["histogram"]))
+        for flag, value in payload["histplot"].items():
+            setattr(histplot, flag, value)
+        if payload.get("data_histogram") is not None:
+            histplot.data_hist = Histogram.from_dict(payload["data_histogram"])
+
+        spec = payload["spec"]
+        plotter = cls(histplot, HistogramVariable(**spec["variable"]))
+        decode_base_plotter(plotter, payload["base"])
+        plotter.pull_ylim = decode_value(spec["pull_ylim"])
+        plotter.pull_label = spec["pull_label"]
+        plotter.color_map_kwargs = decode_value(spec["color_map_kwargs"])
+        plotter.generic_plots = [decode_generic_plot(data) for data in payload.get("generic_plots", [])]
+        plotter.pull_plots = [decode_generic_plot(data) for data in payload.get("pull_plots", [])]
+        plotter._insets = [
+            decode_inset(data, plotter._resolve_inset_refs(data["plots"])) for data in payload.get("insets", [])
+        ]
+        warn_dropped(payload.get("dropped", []))
+        return plotter
+
+    def _resolve_inset_refs(self, refs: dict[str, Any]) -> list[Any]:
+        """Turn the symbolic references written by :meth:`_inset_refs` back into live objects.
+
+        :param refs: One inset's reference block.
+        :return: The plot objects, in replay order.
+        """
+        resolved: list[Any] = []
+        for kind, index in refs["order"]:
+            resolved.append(self.histplot if kind == "histplot" else self.generic_plots[index])
+        return resolved
 
 
 class Histogram2DPlotter(BasePlotter):
