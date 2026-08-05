@@ -109,8 +109,14 @@ src/afplotter/
   convenience.py       high-level one-call functions
   experiments/         Experiment registry + bundled .mplstyle files
   selectionparser/     AST-based query-string -> Polars expression
-  utilities/           Histogram data model, Polars lazy histogram builder
+  utilities/           Histogram data model, Polars lazy histogram builder, plot-spec codec (plotspec.py)
 ```
+
+**Plots and histograms both save to JSON.** `Histogram.save`/`load` stores binned data;
+`HistogramPlotter`/`GenericPlotter`/`Histogram2DPlotter` each have `save`/`load` for the whole
+plot *specification*. `utilities/plotspec.py` owns every value-level rule (ndarray/tuple tagging,
+the hardcoded `BasePlotter` field block, `GenericPlot`/`InsetPlot` encoding) and knows nothing
+about plotters — each plotter walks its own attributes through it. See `docs/getting-started.md`.
 
 **Composed plots are multi-call by design.** Real analysis plots (exclusion limits, coupling
 limits) chain `add_generic_plot(...)` / `add_generic_text(...)` / `add_inset(...)` on a
@@ -130,6 +136,9 @@ limits) chain `add_generic_plot(...)` / `add_generic_text(...)` / `add_inset(...
 | Install from git, not PyPI | Personal/lab tool; `pip install git+https://github.com/AlexanderHeidelbach/AFPlotter.git`. |
 | Petroff 10 as the default cycle, with its red held out | There used to be four uncoordinated palettes: `KITColors` (installed as `axes.prop_cycle`), the ggplot cycler in `belle2_modern.mplstyle` (dead — clobbered by `set_matplotlibrc_params`), seaborn cubehelix (`b2helix`, stacked plots only), and `Experiment.colors` (dead). A stacked and a step plot of the same data looked nothing alike. Now one cycle (`PETROFF_PALETTE.background`, 9 colours) feeds both paths, and `PETROFF_PALETTE.signal = "#bd1f01"` is excluded from it so red always means signal. `KITColors` stays exported, just not default. |
 | Palettes are switchable (`set_palette`) | `KITColors` and `LMUColors` are separate classes now (previously mixed in one). `afplotter.palettes.Palette` pairs a background cycle with its own reserved signal color; `set_palette("KIT"\|"LMU"\|"Petroff")` mirrors `set_experiment(...)`. Default stays Petroff. Register a custom palette via `afplotter.palettes.register_palette(...)`. |
+| Explicitly supplied binned values are never recomputed | `add_entry` skipped `compute_counts` when `counts` were already set, but called `compute_errors` unconditionally — so a pre-binned entry's supplied `errors` were silently replaced with `sqrt(counts)`, losing any non-Poisson uncertainty (weighted MC, anything from `uproot`/`hist`). Now `counts` and `errors` follow the same rule, which also repairs `sum_entries` (its `__iadd__`-propagated quadrature errors were being overwritten) and `Histogram.load` round-trips. Supplied errors win even over a raw `array`; the Poisson fallback stays for entries with `counts` and no `errors`. |
+| Saved plots refuse rather than diverge | A `GenericPlot` can hold any matplotlib argument, including live objects (`transform=`, a `Colormap`). `save` raises a `ValueError` naming the location and writes **no file**, instead of dropping the value and producing a plot that reloads looking different. `skip_unserializable=True` opts out for *keyword* arguments only — dropping a positional would shift every later argument, and dropping an inset's plot would remove a curve rather than a style. Dropped entries are recorded in the file and re-warned on every load, so a round trip cannot launder the loss. |
+| 2D plots save their spec, not their data | `Histogram2DPlot` bins raw event arrays at plot time and stores no 2D counts, so `Histogram2DPlotter.load(path, xhistogram, yhistogram)` takes the data back as arguments. Embedding raw arrays would reintroduce the sample-size-scaling payload the binned-only `Histogram` format exists to avoid. |
 | Signal is a stack layer, not just an overlay | `type="signal"` entries used to be drawn *only* as a `sig_extra` outline peak-matched to the background stack — never part of the stack, and excluded from every total. A stacked plot therefore could not show S+B at all. Now `plot_stacked` appends `Histogram.signal` after `Histogram.entries`, so signal always closes the stack on top in `get_palette().signal` at its true yield, and `get_total_bin_count`/`get_total_bin_errors` are S+B — which is what the `Stat. unc.` band and `add_pull` consume. `sig_extra` now means the opposite: it *excludes* signal from the stack entirely (bars, legend, uncertainty band all fall back to background-only), leaving the peak-matched outline as signal's sole representation — otherwise it would be both stacked and outlined, drawn and legended twice. |
 
 ## Conventions
@@ -153,6 +162,12 @@ These bit us during development and are easy to repeat:
 - **`add_function`/`add_pull` with `density=True` (the default) compare against raw bin counts.**
   A model function must return an absolute `dN/dx` scaled to the real sample size, not a unit-norm
   PDF, or the overlay is invisible and the pull panel clips off-screen.
+- **`add_function`/`add_pull` evaluate their model eagerly and throw it away.** Both sample `func`
+  at 1000 points the moment you call them and keep only the resulting arrays, so no plotter ever
+  holds a callable. Two consequences: a plotter loaded from a file re-renders that curve but cannot
+  re-evaluate the model at a different binning (call `add_function` again instead), and a saved
+  file's size tracks its overlays, not its events — a plot with a fit and a pull panel is ~80 KB
+  while the same plot without them is ~2 KB at any sample size.
 - **`bbox_to_anchor` on `add_inset` does not imply the inset fills that box.** `width`/`height`
   are percentages *of the bbox* and still default to `"38%"`. Pass `width="100%", height="100%"`
   alongside `bbox_to_anchor` for precise placement.
@@ -206,5 +221,8 @@ Open follow-ups:
 - Only `BelleII` (real, Alex's own style) and `Generic` (neutral matplotlib-defaults fallback) ship
   built in. Register your own via `afplotter.experiments.registry.register(...)` rather than adding
   more built-ins for experiments this repo's maintainer isn't part of.
+- `sum_entries` mutates its first summand in place (`HistogramEntry.__iadd__` does
+  `self.counts += other.counts`) and the combined entry's `errors` alias that summand's array. A
+  caller holding the entry it passed in silently gets different data back. Tracked as issue #42.
 - A few tests in `tests/test_histogramplot.py` assert only "didn't crash" — see the testing
   philosophy above.
