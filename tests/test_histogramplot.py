@@ -1,3 +1,5 @@
+import json
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -567,3 +569,85 @@ def test_loaded_histogram_plotter_renders_the_same_overlay(tmp_path, synthetic_h
     assert len(loaded_curves) == len(original_curves) > 0
     for restored, original in zip(loaded_curves, original_curves):
         assert np.allclose(restored, original)
+
+
+def _2d_histograms():
+    rng = np.random.default_rng(seed=11)
+    xhist = Histogram()
+    xhist.binning = np.linspace(0, 10, 11)
+    xhist.add_entry(HistogramEntry(name="x", array=rng.uniform(0, 10, size=400)))
+    yhist = Histogram()
+    yhist.binning = np.linspace(0, 5, 6)
+    yhist.add_entry(HistogramEntry(name="y", array=rng.uniform(0, 5, size=400)))
+    return xhist, yhist
+
+
+def test_histogram_2d_plotter_save_load_round_trips_the_spec(tmp_path):
+    """Every asserted value is non-default: cmap defaults to 'viridis', norm to 'linear'."""
+    xhist, yhist = _2d_histograms()
+    histplot = Histogram2DPlot(xhist, yhist)
+    histplot.cmap = "plasma"
+    histplot.norm = "log"
+    histplot.cmin = 0.5
+    histplot.cmax = 42.0
+    histplot.cbar_label = "events / bin"
+    histplot.density = True
+    plotter = Histogram2DPlotter(histplot, HistogramVariable("mass", "GeV"), HistogramVariable("time", "ns"))
+    plotter.figsize = (7, 3)
+    plotter.add_generic_plot(GenericPlot("plot", np.array([1.0, 2.0]), np.array([3.0, 4.0]), color="red"))
+
+    path = tmp_path / "p2d.json"
+    plotter.save(path)
+
+    fresh_x, fresh_y = _2d_histograms()
+    loaded = Histogram2DPlotter.load(path, xhistogram=fresh_x, yhistogram=fresh_y)
+
+    assert loaded.figsize == (7, 3)
+    assert loaded.xvariable.name == "mass"
+    assert loaded.yvariable.unit == "ns"
+    assert loaded.xlabel == "mass (GeV)"
+    assert loaded.histplot.cmap == "plasma"
+    assert loaded.histplot.norm == "log"
+    assert loaded.histplot.cmin == 0.5
+    assert loaded.histplot.cmax == 42.0
+    assert loaded.histplot.cbar_label == "events / bin"
+    assert loaded.histplot.density is True
+    assert loaded.generic_plots[0].kwargs == {"color": "red"}
+    # The data came from the caller, not the file.
+    assert loaded.histplot.xhistogram is fresh_x
+    assert loaded.histplot.yhistogram is fresh_y
+
+
+def test_histogram_2d_plotter_save_does_not_embed_event_data(tmp_path):
+    """Raw arrays in the payload are exactly what this design rejects."""
+    xhist, yhist = _2d_histograms()
+    plotter = Histogram2DPlotter(Histogram2DPlot(xhist, yhist), HistogramVariable("mass"), HistogramVariable("time"))
+    path = tmp_path / "p2d.json"
+    plotter.save(path)
+
+    payload = json.loads(path.read_text())
+    assert "histogram" not in payload
+    assert path.stat().st_size < 2_000
+
+
+def test_histogram_2d_plotter_load_requires_both_histograms(tmp_path):
+    xhist, yhist = _2d_histograms()
+    plotter = Histogram2DPlotter(Histogram2DPlot(xhist, yhist), HistogramVariable("mass"), HistogramVariable("time"))
+    path = tmp_path / "p2d.json"
+    plotter.save(path)
+
+    with pytest.raises(TypeError):
+        Histogram2DPlotter.load(path)
+
+
+def test_loaded_histogram_2d_plotter_renders(tmp_path):
+    xhist, yhist = _2d_histograms()
+    plotter = Histogram2DPlotter(Histogram2DPlot(xhist, yhist), HistogramVariable("mass"), HistogramVariable("time"))
+    path = tmp_path / "p2d.json"
+    plotter.save(path)
+
+    fresh_x, fresh_y = _2d_histograms()
+    loaded = Histogram2DPlotter.load(path, xhistogram=fresh_x, yhistogram=fresh_y)
+    ax = loaded.plot(save=False)
+    assert ax.get_xlabel() == "mass"
+    plt.close("all")

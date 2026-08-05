@@ -1122,3 +1122,99 @@ class Histogram2DPlotter(BasePlotter):
             plt.show()
 
         return ax
+
+    def save(self, path: str | Path, skip_unserializable: bool = False) -> None:
+        """Write this plotter's specification to a JSON file, without its event data.
+
+        :class:`Histogram2DPlot` bins raw event arrays at plot time and stores no 2D
+        counts, so there is nothing binned to embed. The file holds styling, limits,
+        colour-map settings, variables and overlays; :meth:`load` takes the histograms
+        back as arguments. Overlays added through :meth:`add_function`/:meth:`add_pull`
+        elsewhere in this library are saved as the sampled curve, not as the model — a
+        reloaded plot re-renders that curve but cannot re-evaluate the function at a
+        different binning.
+
+        :param path: Destination file path. Any parent directory must already exist.
+        :param skip_unserializable: Drop keyword arguments that cannot be saved, recording
+            them in the file so :meth:`load` can warn. Positional arguments are never
+            dropped.
+        :raises ValueError: If any value cannot be saved and ``skip_unserializable`` is
+            false. Nothing is written in that case.
+        :return: None
+        """
+        dropped: list[str] = []
+        try:
+            base = encode_base_plotter(self)
+            generic_plots = []
+            for index, plot in enumerate(self.generic_plots):
+                try:
+                    data, plot_dropped = encode_generic_plot(plot, skip_unserializable=skip_unserializable)
+                except UnserializableValue as error:
+                    error.where = f"generic_plots[{index}]: {error.where}"
+                    raise
+                generic_plots.append(data)
+                dropped.extend(f"generic_plots[{index}]: {item}" for item in plot_dropped)
+            spec = {
+                "xvariable": {"name": self.xvariable.name, "unit": self.xvariable.unit},
+                "yvariable": {"name": self.yvariable.name, "unit": self.yvariable.unit},
+            }
+            histplot = {
+                "density": self.histplot.density,
+                "log": self.histplot.log,
+                "cmap": self.histplot.cmap,
+                "norm": self.histplot.norm,
+                "cmin": self.histplot.cmin,
+                "cmax": self.histplot.cmax,
+                "cbar_label": self.histplot.cbar_label,
+            }
+        except UnserializableValue as error:
+            raise ValueError(f"Cannot save this plotter: {error.where} holds {error.value_repr}") from error
+
+        payload = {
+            "format_version": PLOT_FORMAT_VERSION,
+            "base": base,
+            "spec": spec,
+            "histplot": histplot,
+            "generic_plots": generic_plots,
+            "dropped": dropped,
+        }
+        Path(path).write_text(json.dumps(payload))
+
+    @classmethod
+    def load(cls, path: str | Path, xhistogram: Histogram, yhistogram: Histogram) -> "Histogram2DPlotter":
+        """Read a plotter written by :meth:`save`, re-attaching its event data.
+
+        :param path: Path to a JSON file written by :meth:`save`.
+        :param xhistogram: The x-axis histogram, carrying raw event arrays.
+        :param yhistogram: The y-axis histogram, carrying raw event arrays.
+        :return: An editable plotter: adjust limits, add overlays, call ``plot()``.
+        :raises ValueError: If the file's ``format_version`` is unsupported, its top-level
+            JSON is not an object, or a required key is missing.
+        """
+        payload = json.loads(Path(path).read_text())
+        if not isinstance(payload, dict):
+            raise ValueError(f"Malformed plot file {path}: expected a JSON object at the top level.")
+        version = payload.get("format_version")
+        if version != PLOT_FORMAT_VERSION:
+            raise ValueError(
+                f"Unsupported format_version {version!r} in {path}; "
+                f"this version of AFPlotter writes and reads format_version {PLOT_FORMAT_VERSION}."
+            )
+        for key in ("base", "spec", "histplot"):
+            if key not in payload:
+                raise ValueError(f"Malformed plot file {path}: missing required key {key!r}.")
+
+        histplot = Histogram2DPlot(xhistogram, yhistogram)
+        for setting, value in payload["histplot"].items():
+            setattr(histplot, setting, value)
+
+        spec = payload["spec"]
+        plotter = cls(
+            histplot,
+            HistogramVariable(**spec["xvariable"]),
+            HistogramVariable(**spec["yvariable"]),
+        )
+        decode_base_plotter(plotter, payload["base"])
+        plotter.generic_plots = [decode_generic_plot(data) for data in payload.get("generic_plots", [])]
+        warn_dropped(payload.get("dropped", []))
+        return plotter
