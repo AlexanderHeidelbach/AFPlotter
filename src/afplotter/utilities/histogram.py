@@ -246,7 +246,8 @@ class Histogram:
         binning = self.binning
         if isinstance(binning, int):
             raise ValueError("Binning was not resolved to an array before computing entry errors")
-        entry.compute_errors(binning=binning)
+        if len(entry.errors) == 0:
+            entry.compute_errors(binning=binning)
 
         if clear:
             entry.clear_array()

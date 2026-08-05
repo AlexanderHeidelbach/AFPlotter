@@ -333,3 +333,64 @@ def test_load_rejects_a_payload_missing_entries(tmp_path):
 
     with pytest.raises(ValueError, match="entries"):
         Histogram.load(path)
+
+
+def test_add_entry_preserves_supplied_errors_on_a_prebinned_entry():
+    """Issue #37: pre-binned errors are authoritative and must not be recomputed."""
+    counts = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    errors = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+    # Guard the fixture: if these coincided with sqrt(counts) the test would pass
+    # whether errors were preserved or overwritten.
+    assert not np.allclose(errors, np.sqrt(counts))
+
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    hist.add_entry(HistogramEntry(name="pre", counts=counts, errors=errors))
+
+    assert np.allclose(hist.entries["pre"].errors, errors)
+
+
+def test_add_entry_falls_back_to_poisson_when_no_errors_supplied():
+    """The sqrt(counts) fallback is load-bearing for pre-binned entries without errors."""
+    counts = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+
+    hist = Histogram()
+    hist.binning = np.linspace(0.0, 5.0, 6)
+    hist.add_entry(HistogramEntry(name="pre", counts=counts))
+
+    assert np.allclose(hist.entries["pre"].errors, np.sqrt(counts))
+
+
+def test_add_entry_computes_weighted_errors_from_a_raw_array():
+    """With a raw array and no supplied errors, errors stay sqrt(sum w**2), not sqrt(counts)."""
+    hist = Histogram()
+    hist.binning = np.array([0.0, 1.0, 2.0])
+    # Four events in bin 0, two in bin 1, each weighted 2.0.
+    array = np.array([0.5, 0.5, 0.5, 0.5, 1.5, 1.5])
+    hist.add_entry(HistogramEntry(name="w", array=array, weight=2.0))
+
+    counts = hist.entries["w"].counts
+    errors = hist.entries["w"].errors
+    assert np.allclose(counts, [8.0, 4.0])
+    assert np.allclose(errors, [4.0, np.sqrt(8.0)])  # sqrt(sum w**2) = sqrt(4*4), sqrt(2*4)
+    # The whole point of the weighted path: it does not agree with Poisson.
+    assert not np.allclose(errors, np.sqrt(counts))
+
+
+def test_add_entry_supplied_errors_win_over_a_raw_array():
+    """Precedence: supplied binned values are never recomputed, exactly as counts behave.
+
+    This entry carries both a raw ``array`` and explicit ``errors``. The supplied errors
+    win. Pinning this is the point of the test -- it is what fails if someone later
+    switches to the 'recompute whenever array exists' reading.
+    """
+    array = np.array([0.5, 0.5, 0.5, 0.5, 1.5, 1.5])
+    counts = np.array([4.0, 2.0])
+    errors = np.array([0.25, 0.75])
+    assert not np.allclose(errors, np.sqrt(counts))
+
+    hist = Histogram()
+    hist.binning = np.array([0.0, 1.0, 2.0])
+    hist.add_entry(HistogramEntry(name="both", array=array, counts=counts, errors=errors))
+
+    assert np.allclose(hist.entries["both"].errors, errors)
