@@ -1,9 +1,12 @@
+import json
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from matplotlib.colors import to_hex
 from matplotlib.patches import Polygon
 
+from afplotter.genericplot import GenericPlot
 from afplotter.histogramplot import (
     Histogram2DPlot,
     Histogram2DPlotter,
@@ -436,3 +439,264 @@ def test_2d_plot_rejects_a_histogram_without_raw_data(tmp_path):
     with pytest.raises(ValueError, match="raw event data"):
         plot2d.plot()
     plt.close(fig)
+
+
+def _histogram_plotter(histogram):
+    """A plotter whose every saved field differs from its constructed default."""
+    histplot = HistogramPlot(histogram)
+    histplot.stacked = True
+    histplot.sig_extra = True
+    histplot.uncertainty = True
+    histplot.density = True
+    histplot.linewidth = 2.5
+    histplot.edgecolor = "navy"
+    plotter = HistogramPlotter(histplot, HistogramVariable(name="mass", unit="GeV"))
+    plotter.figsize = (7, 3)
+    plotter.ylim = (1.0, 500.0)
+    plotter.pull_ylim = (-2.5, 2.5)
+    plotter.pull_label = "residual"
+    plotter.color_map_kwargs = {"min_val": 0.0, "max_val": 1.0, "cmap": "plasma", "label": "score"}
+    return plotter
+
+
+def test_histogram_plotter_save_load_round_trips_spec_and_data(tmp_path, synthetic_histogram):
+    plotter = _histogram_plotter(synthetic_histogram)
+    plotter.add_function(lambda x: 30.0 * np.exp(-((x - 5.0) ** 2) / 2.0), density=False, color="red")
+
+    path = tmp_path / "p.json"
+    plotter.save(path)
+    loaded = HistogramPlotter.load(path)
+
+    assert loaded.figsize == (7, 3)
+    assert isinstance(loaded.figsize, tuple)
+    assert loaded.ylim == (1.0, 500.0)
+    assert loaded.pull_ylim == (-2.5, 2.5)
+    assert loaded.pull_label == "residual"
+    assert loaded.color_map_kwargs == {"min_val": 0.0, "max_val": 1.0, "cmap": "plasma", "label": "score"}
+
+    assert loaded.variable.name == "mass"
+    assert loaded.variable.unit == "GeV"
+    # xlabel is a read-only property derived from `variable`, not from a stored _xlabel;
+    # this proves `variable` was restored.
+    assert loaded.xlabel == "mass (GeV)"
+
+    assert loaded.histplot.stacked is True
+    assert loaded.histplot.sig_extra is True
+    assert loaded.histplot.uncertainty is True
+    assert loaded.histplot.density is True
+    assert loaded.histplot.linewidth == 2.5
+    assert loaded.histplot.edgecolor == "navy"
+
+    assert np.allclose(loaded.histplot.histogram.binning, synthetic_histogram.binning)
+    assert np.allclose(
+        loaded.histplot.histogram.get_bin_counts()[0],
+        synthetic_histogram.get_bin_counts()[0],
+    )
+    assert np.allclose(
+        loaded.histplot.histogram.get_bin_errors()[0],
+        synthetic_histogram.get_bin_errors()[0],
+    )
+    assert loaded.histplot.histogram.get_names() == synthetic_histogram.get_names()
+
+    # The overlay add_function sampled is preserved as data, not as a callable.
+    assert len(loaded.generic_plots) == 1
+    assert loaded.generic_plots[0].plotmethod == "plot"
+    assert np.allclose(loaded.generic_plots[0].args[1], plotter.generic_plots[0].args[1])
+    assert loaded.generic_plots[0].kwargs == {"color": "red"}
+
+
+def test_histogram_plotter_save_load_round_trips_pull_plots(tmp_path, synthetic_histogram):
+    plotter = _histogram_plotter(synthetic_histogram)
+    plotter.add_pull(lambda x: 30.0 * np.exp(-((x - 5.0) ** 2) / 2.0), density=False, color="red")
+
+    path = tmp_path / "p.json"
+    plotter.save(path)
+    loaded = HistogramPlotter.load(path)
+
+    assert [plot.plotmethod for plot in loaded.pull_plots] == [plot.plotmethod for plot in plotter.pull_plots]
+    assert np.allclose(loaded.pull_plots[-1].args[1], plotter.pull_plots[-1].args[1])
+    assert loaded.pull_ylim == plotter.pull_ylim
+
+
+def test_histogram_plotter_resave_preserves_dropped_entries(tmp_path, synthetic_histogram):
+    """Mirrors GenericPlotter's equivalent test: `save` only records what *this* call
+    dropped, so a plotter loaded from a `skip_unserializable=True` save must carry that
+    memory forward into `_dropped_on_load`, or a resave-then-reload silently loses it."""
+    ax = plt.subplots()[1]
+    plotter = _histogram_plotter(synthetic_histogram)
+    plotter.add_generic_plot(GenericPlot("plot", np.array([1.0]), transform=ax.transAxes))
+
+    first_path = tmp_path / "first.json"
+    plotter.save(first_path, skip_unserializable=True)
+    plt.close("all")
+
+    with pytest.warns(UserWarning, match="transform"):
+        loaded = HistogramPlotter.load(first_path)
+
+    second_path = tmp_path / "second.json"
+    loaded.save(second_path)
+
+    with pytest.warns(UserWarning, match="transform"):
+        HistogramPlotter.load(second_path)
+
+
+def test_histogram_plotter_inset_references_the_loaded_objects(tmp_path, synthetic_histogram):
+    plotter = _histogram_plotter(synthetic_histogram)
+    plotter.add_generic_plot(GenericPlot("plot", np.array([1.0, 2.0]), np.array([3.0, 4.0])))
+    plotter.add_inset(xlim=(2.0, 4.0), title="zoom")
+
+    path = tmp_path / "p.json"
+    plotter.save(path)
+    loaded = HistogramPlotter.load(path)
+
+    assert len(loaded._insets) == 1
+    assert loaded._insets[0].title == "zoom"
+    # Default inset content is [histplot] + generic_plots; both must be the LIVE objects.
+    assert loaded._insets[0].plots[0] is loaded.histplot
+    assert loaded._insets[0].plots[1] is loaded.generic_plots[0]
+
+
+def test_histogram_plotter_file_size_does_not_scale_with_sample_size(tmp_path):
+    """The point of embedding binned-only data: caching stays viable at any sample size."""
+    rng = np.random.default_rng(seed=7)
+    sizes = []
+    for n_events, name in ((1_000, "small.json"), (100_000, "large.json")):
+        histogram = Histogram()
+        histogram.binning = np.linspace(0, 10, 21)
+        histogram.add_entry(HistogramEntry(name="bkg", array=rng.uniform(0, 10, size=n_events)))
+        plotter = HistogramPlotter(HistogramPlot(histogram), HistogramVariable(name="mass"))
+        path = tmp_path / name
+        plotter.save(path)
+        sizes.append(path.stat().st_size)
+
+    assert abs(sizes[1] - sizes[0]) / sizes[0] < 0.10
+
+
+def test_loaded_histogram_plotter_renders_the_same_overlay(tmp_path, synthetic_histogram):
+    """Round-tripping a dict is not the same as re-rendering a plot."""
+    plotter = _histogram_plotter(synthetic_histogram)
+    plotter.add_function(lambda x: 30.0 * np.exp(-((x - 5.0) ** 2) / 2.0), density=False, color="red")
+
+    path = tmp_path / "p.json"
+    plotter.save(path)
+    loaded = HistogramPlotter.load(path)
+
+    original_ax, _ = plotter.plot(save=False)
+    original_curves = [line.get_ydata() for line in original_ax.lines]
+    plt.close("all")
+
+    loaded_ax, _ = loaded.plot(save=False)
+    loaded_curves = [line.get_ydata() for line in loaded_ax.lines]
+    plt.close("all")
+
+    assert len(loaded_curves) == len(original_curves) > 0
+    for restored, original in zip(loaded_curves, original_curves):
+        assert np.allclose(restored, original)
+
+
+def _2d_histograms():
+    rng = np.random.default_rng(seed=11)
+    xhist = Histogram()
+    xhist.binning = np.linspace(0, 10, 11)
+    xhist.add_entry(HistogramEntry(name="x", array=rng.uniform(0, 10, size=400)))
+    yhist = Histogram()
+    yhist.binning = np.linspace(0, 5, 6)
+    yhist.add_entry(HistogramEntry(name="y", array=rng.uniform(0, 5, size=400)))
+    return xhist, yhist
+
+
+def test_histogram_2d_plotter_save_load_round_trips_the_spec(tmp_path):
+    """Every asserted value is non-default: cmap defaults to 'viridis', norm to 'linear'."""
+    xhist, yhist = _2d_histograms()
+    histplot = Histogram2DPlot(xhist, yhist)
+    histplot.cmap = "plasma"
+    histplot.norm = "log"
+    histplot.cmin = 0.5
+    histplot.cmax = 42.0
+    histplot.cbar_label = "events / bin"
+    histplot.density = True
+    histplot.log = True
+    plotter = Histogram2DPlotter(histplot, HistogramVariable("mass", "GeV"), HistogramVariable("time", "ns"))
+    plotter.figsize = (7, 3)
+    plotter.add_generic_plot(GenericPlot("plot", np.array([1.0, 2.0]), np.array([3.0, 4.0]), color="red"))
+
+    path = tmp_path / "p2d.json"
+    plotter.save(path)
+
+    fresh_x, fresh_y = _2d_histograms()
+    loaded = Histogram2DPlotter.load(path, xhistogram=fresh_x, yhistogram=fresh_y)
+
+    assert loaded.figsize == (7, 3)
+    assert loaded.xvariable.name == "mass"
+    assert loaded.yvariable.unit == "ns"
+    assert loaded.xlabel == "mass (GeV)"
+    assert loaded.histplot.cmap == "plasma"
+    assert loaded.histplot.norm == "log"
+    assert loaded.histplot.cmin == 0.5
+    assert loaded.histplot.cmax == 42.0
+    assert loaded.histplot.cbar_label == "events / bin"
+    assert loaded.histplot.density is True
+    assert loaded.histplot.log is True
+    assert loaded.generic_plots[0].kwargs == {"color": "red"}
+    # The data came from the caller, not the file.
+    assert loaded.histplot.xhistogram is fresh_x
+    assert loaded.histplot.yhistogram is fresh_y
+
+
+def test_histogram_2d_plotter_resave_preserves_dropped_entries(tmp_path):
+    """Mirrors GenericPlotter's equivalent test: `save` only records what *this* call
+    dropped, so a plotter loaded from a `skip_unserializable=True` save must carry that
+    memory forward into `_dropped_on_load`, or a resave-then-reload silently loses it."""
+    ax = plt.subplots()[1]
+    xhist, yhist = _2d_histograms()
+    plotter = Histogram2DPlotter(Histogram2DPlot(xhist, yhist), HistogramVariable("mass"), HistogramVariable("time"))
+    plotter.add_generic_plot(GenericPlot("plot", np.array([1.0]), transform=ax.transAxes))
+
+    first_path = tmp_path / "first.json"
+    plotter.save(first_path, skip_unserializable=True)
+    plt.close("all")
+
+    fresh_x, fresh_y = _2d_histograms()
+    with pytest.warns(UserWarning, match="transform"):
+        loaded = Histogram2DPlotter.load(first_path, xhistogram=fresh_x, yhistogram=fresh_y)
+
+    second_path = tmp_path / "second.json"
+    loaded.save(second_path)
+
+    with pytest.warns(UserWarning, match="transform"):
+        Histogram2DPlotter.load(second_path, xhistogram=fresh_x, yhistogram=fresh_y)
+
+
+def test_histogram_2d_plotter_save_does_not_embed_event_data(tmp_path):
+    """Raw arrays in the payload are exactly what this design rejects."""
+    xhist, yhist = _2d_histograms()
+    plotter = Histogram2DPlotter(Histogram2DPlot(xhist, yhist), HistogramVariable("mass"), HistogramVariable("time"))
+    path = tmp_path / "p2d.json"
+    plotter.save(path)
+
+    payload = json.loads(path.read_text())
+    assert "histogram" not in payload
+    assert path.stat().st_size < 2_000
+
+
+def test_histogram_2d_plotter_load_requires_both_histograms(tmp_path):
+    xhist, yhist = _2d_histograms()
+    plotter = Histogram2DPlotter(Histogram2DPlot(xhist, yhist), HistogramVariable("mass"), HistogramVariable("time"))
+    path = tmp_path / "p2d.json"
+    plotter.save(path)
+
+    with pytest.raises(TypeError):
+        Histogram2DPlotter.load(path)
+
+
+def test_loaded_histogram_2d_plotter_renders(tmp_path):
+    xhist, yhist = _2d_histograms()
+    plotter = Histogram2DPlotter(Histogram2DPlot(xhist, yhist), HistogramVariable("mass"), HistogramVariable("time"))
+    path = tmp_path / "p2d.json"
+    plotter.save(path)
+
+    fresh_x, fresh_y = _2d_histograms()
+    loaded = Histogram2DPlotter.load(path, xhistogram=fresh_x, yhistogram=fresh_y)
+    ax = loaded.plot(save=False)
+    assert ax.get_xlabel() == "mass"
+    plt.close("all")

@@ -1,9 +1,22 @@
+import json
+from pathlib import Path
 from typing import Any
 
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 
 from afplotter.baseplotter import BasePlotter
+from afplotter.utilities.plotspec import (
+    PLOT_FORMAT_VERSION,
+    UnserializableValue,
+    decode_base_plotter,
+    decode_generic_plot,
+    decode_inset,
+    encode_base_plotter,
+    encode_generic_plot,
+    encode_inset,
+    warn_dropped,
+)
 
 
 class GenericPlot:
@@ -119,6 +132,7 @@ class GenericPlotter(BasePlotter):
 
         self._plots: list[GenericPlot] = []
         self._insets: list[InsetPlot] = []
+        self._dropped_on_load: list[str] = []
 
     def add_generic_plot(self, plotmethod: str, *args: Any, **kwargs: Any) -> None:
         self._plots.append(GenericPlot(plotmethod, *args, **kwargs))
@@ -181,3 +195,123 @@ class GenericPlotter(BasePlotter):
             plt.show()
 
         return ax
+
+    def save(self, path: str | Path, skip_unserializable: bool = False) -> None:
+        """Write this plotter's specification to a JSON file.
+
+        The saved file holds the plot's *specification*: styling, limits, text, and every
+        queued overlay's method name, arguments and keyword arguments. Overlays added via
+        a model function were already evaluated into sampled arrays when they were added,
+        so a loaded plot re-renders them at that sampled resolution -- it cannot
+        re-evaluate the model at a different binning.
+
+        :param path: Destination file path. Any parent directory must already exist.
+        :param skip_unserializable: Drop keyword arguments that cannot be saved, recording
+            them in the file so :meth:`load` can warn. Positional arguments are never
+            dropped.
+        :raises ValueError: If any value cannot be saved and ``skip_unserializable`` is
+            false. Nothing is written in that case.
+        :return: None
+        """
+        dropped: list[str] = list(self._dropped_on_load)
+        try:
+            base = encode_base_plotter(self)
+            plots = []
+            for index, plot in enumerate(self._plots):
+                try:
+                    data, plot_dropped = encode_generic_plot(plot, skip_unserializable=skip_unserializable)
+                except UnserializableValue as error:
+                    error.where = f"plots[{index}]: {error.where}"
+                    raise
+                plots.append(data)
+                dropped.extend(f"plots[{index}]: {item}" for item in plot_dropped)
+            insets = []
+            for index, inset in enumerate(self._insets):
+                try:
+                    insets.append(encode_inset(inset, self._inset_refs(inset)))
+                except UnserializableValue as error:
+                    error.where = f"insets[{index}]: {error.where}"
+                    raise
+        except UnserializableValue as error:
+            raise ValueError(
+                f"Cannot save this plotter: {error.where} holds {error.value_repr}. "
+                "Remove it, pass skip_unserializable=True, or set it after load."
+            ) from error
+
+        payload = {
+            "format_version": PLOT_FORMAT_VERSION,
+            "base": base,
+            "plots": plots,
+            "insets": insets,
+            "dropped": dropped,
+        }
+        Path(path).write_text(json.dumps(payload))
+
+    def _inset_refs(self, inset: InsetPlot) -> dict[str, Any]:
+        """Describe an inset's plots as indices into ``self._plots``, or as an alias.
+
+        ``add_inset(plots=None)`` aliases the inset's ``plots`` to this plotter's own
+        ``_plots`` list -- the same object, not a copy -- so a plot added after ``add_inset``
+        also shows up in the inset. That identity is recorded here (``{"alias": "all"}``)
+        so :meth:`_resolve_inset_refs` can reconstruct it on load, instead of freezing a
+        snapshot of indices that would stop tracking future plots.
+
+        :param inset: The inset to describe.
+        :return: ``{"alias": "all"}`` if ``inset.plots is self._plots``, else
+            ``{"indices": [<index>, ...]}``.
+        :raises UnserializableValue: If the inset replays an object this plotter does not own.
+        """
+        if inset.plots is self._plots:
+            return {"alias": "all"}
+
+        indices = []
+        for plot in inset.plots:
+            for index, own in enumerate(self._plots):
+                if plot is own:
+                    indices.append(index)
+                    break
+            else:
+                raise UnserializableValue(plot, where="an inset plot this plotter does not own")
+        return {"indices": indices}
+
+    def _resolve_inset_refs(self, refs: dict[str, Any]) -> list[Any]:
+        """Turn the symbolic references written by :meth:`_inset_refs` back into live objects.
+
+        :param refs: One inset's reference block.
+        :return: The plot objects, in replay order. When the inset aliased this plotter's own
+            ``_plots`` list at save time, ``self._plots`` itself is returned -- not a copy --
+            so a plot appended after load still appears when the inset replays.
+        """
+        if refs.get("alias") == "all":
+            return self._plots
+        return [self._plots[index] for index in refs["indices"]]
+
+    @classmethod
+    def load(cls, path: str | Path) -> "GenericPlotter":
+        """Read a plotter written by :meth:`save`.
+
+        :param path: Path to a JSON file written by :meth:`save`.
+        :return: An editable plotter: adjust limits, add overlays, call ``plot()``.
+        :raises ValueError: If the file's ``format_version`` is unsupported, its top-level
+            JSON is not an object, or a required key is missing.
+        """
+        payload = json.loads(Path(path).read_text())
+        if not isinstance(payload, dict):
+            raise ValueError(f"Malformed plot file {path}: expected a JSON object at the top level.")
+        version = payload.get("format_version")
+        if version != PLOT_FORMAT_VERSION:
+            raise ValueError(
+                f"Unsupported format_version {version!r} in {path}; "
+                f"this version of AFPlotter writes and reads format_version {PLOT_FORMAT_VERSION}."
+            )
+        for key in ("base", "plots", "insets"):
+            if key not in payload:
+                raise ValueError(f"Malformed plot file {path}: missing required key {key!r}.")
+
+        plotter = cls()
+        decode_base_plotter(plotter, payload["base"])
+        plotter._plots = [decode_generic_plot(data) for data in payload["plots"]]
+        plotter._insets = [decode_inset(data, plotter._resolve_inset_refs(data["plots"])) for data in payload["insets"]]
+        plotter._dropped_on_load = payload.get("dropped", [])
+        warn_dropped(plotter._dropped_on_load)
+        return plotter
