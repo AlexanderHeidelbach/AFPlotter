@@ -56,6 +56,79 @@ def test_legend_max_rows_caps_rows_and_grows_columns():
     assert _legend_column_count(max_rows=6, n_labels=6) == 1
 
 
+def _build_legend_axes(max_rows, n_labels):
+    plotter = ConcretePlotter()
+    plotter.legend_max_rows = max_rows
+    fig, ax = plt.subplots()
+    for i in range(n_labels):
+        ax.plot([0, 1], [i, i], label=f"entry {i}")
+    plotter._add_legend(ax=ax)
+    return plotter, fig, ax
+
+
+def _group_by_column(fig, legend):
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    columns: dict[int, list[str]] = {}
+    for text in legend.get_texts():
+        if text.get_text():
+            # Same 5px bucketing as _legend_column_count.
+            columns.setdefault(round(text.get_window_extent(renderer).x0 / 5), []).append(text.get_text())
+    return [columns[x] for x in sorted(columns)]
+
+
+def _legend_columns(max_rows, n_labels):
+    """Return the real (non-empty) legend labels grouped by column, left to right."""
+    _, fig, ax = _build_legend_axes(max_rows, n_labels)
+    cols = _group_by_column(fig, ax.get_legend())
+    plt.close(fig)
+    return cols
+
+
+def test_legend_fills_columns_to_max_rows():
+    cols = _legend_columns(max_rows=4, n_labels=6)
+    assert [len(c) for c in cols] == [4, 2]  # matplotlib alone gives [3, 3]
+    assert cols == [[f"entry {i}" for i in range(4)], ["entry 4", "entry 5"]]
+    assert [len(c) for c in _legend_columns(max_rows=4, n_labels=9)] == [4, 4, 1]
+
+
+def test_legend_single_column_is_not_padded():
+    _, fig, ax = _build_legend_axes(max_rows=4, n_labels=3)
+    assert len(ax.get_legend().get_texts()) == 3
+    plt.close(fig)
+
+
+def test_legend_no_padding_when_columns_divide_evenly():
+    _, fig, ax = _build_legend_axes(max_rows=4, n_labels=8)
+    assert len(ax.get_legend().get_texts()) == 8
+    plt.close(fig)
+
+
+def test_legend_placeholders_are_invisible():
+    _, fig, ax = _build_legend_axes(max_rows=4, n_labels=6)
+    legend = ax.get_legend()
+    placeholders = [h for h, t in zip(legend.legend_handles, legend.get_texts()) if not t.get_text()]
+    assert len(placeholders) == 2  # 2 * 4 slots - 6 entries
+    for handle in placeholders:
+        assert handle.get_linestyle() == "None"
+        assert handle.get_marker() in ("", "None", None)
+    plt.close(fig)
+
+
+def test_legend_fills_columns_across_multiple_axes():
+    plotter = ConcretePlotter()
+    plotter.legend_max_rows = 4
+    fig, ax1 = plt.subplots()
+    ax2 = ax1.twinx()
+    for i in range(3):
+        ax1.plot([0, 1], [i, i], label=f"a{i}")
+        ax2.plot([0, 1], [i, i], label=f"b{i}")
+    plotter._add_legend(ax=[ax1, ax2])
+    cols = _group_by_column(fig, ax1.get_legend())
+    plt.close(fig)
+    assert cols == [["a0", "a1", "a2", "b0"], ["b1", "b2"]]
+
+
 def test_property_setters_roundtrip():
     plotter = ConcretePlotter()
     plotter.figsize = (6, 4)

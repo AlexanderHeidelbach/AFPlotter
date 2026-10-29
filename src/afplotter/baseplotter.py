@@ -4,6 +4,7 @@ import numpy as np
 from abc import ABC
 from cycler import cycler
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 from afplotter.experiments.context import get_experiment
 from afplotter.palettes import get_palette
@@ -182,7 +183,8 @@ class BasePlotter(ABC):
         ``ncol = ceil(len(labels) / legend_max_rows)``. Raising this value
         therefore produces *fewer*, taller columns; lowering it produces more,
         shorter ones. To force a single column, set it to at least the number
-        of legend entries.
+        of legend entries. Columns are filled top-down to this cap; only the
+        last column is shorter (matplotlib alone would spread entries evenly).
 
         :return: The per-column row cap. Defaults to 4.
         """
@@ -443,6 +445,12 @@ class BasePlotter(ABC):
 
         if labels:
             ncol = len(labels) // self.legend_max_rows + (1 if len(labels) % self.legend_max_rows != 0 else 0)
+            if ncol > 1:
+                # matplotlib splits entries evenly across columns; pad to a full grid with invisible
+                # placeholders so columns fill to legend_max_rows and only the last one is short.
+                for _ in range(ncol * self.legend_max_rows - len(labels)):
+                    lines.append(Line2D([], [], linestyle="none", marker=""))
+                    labels.append("")
             legend_kwargs: dict[str, Any] = {
                 "ncol": ncol,
                 "title": self.legend_title,
