@@ -1,4 +1,5 @@
 from typing import Any
+import numbers
 import os
 import numpy as np
 from abc import ABC
@@ -236,24 +237,28 @@ class BasePlotter(ABC):
         count is ``len(sizes)`` and entries are assigned in order. The sizes must sum to
         the number of legend entries, otherwise drawing the legend raises ``ValueError``.
 
-        :return: A copy-safe list of column sizes, or None for automatic layout.
+        :return: A copy of the column sizes (mutating it does not affect the plotter), or None for automatic layout.
         """
-        return self._legend_column_sizes
+        return None if self._legend_column_sizes is None else list(self._legend_column_sizes)
 
     @legend_column_sizes.setter
     def legend_column_sizes(self, legend_column_sizes: list[int] | None) -> None:
         """Set the explicit column sizes.
 
         :param legend_column_sizes: Positive column sizes, or None for automatic layout. Stored as a copy.
-        :raises ValueError: If the list is empty or any size is below 1.
+        :raises ValueError: If the list is empty or any size is not an integer >= 1.
         """
         if legend_column_sizes is None:
             self._legend_column_sizes = None
             return
         sizes = list(legend_column_sizes)
-        if not sizes or any(size < 1 for size in sizes):
-            raise ValueError(f"legend_column_sizes must be a non-empty list of sizes >= 1, got {sizes!r}")
-        self._legend_column_sizes = sizes
+        if (
+            not sizes
+            or not all(isinstance(size, numbers.Integral) and not isinstance(size, bool) for size in sizes)
+            or any(size < 1 for size in sizes)
+        ):
+            raise ValueError(f"legend_column_sizes must be a non-empty list of integers >= 1, got {sizes!r}")
+        self._legend_column_sizes = [int(size) for size in sizes]
 
     @property
     def legend_title(self) -> str | None:
@@ -489,8 +494,12 @@ class BasePlotter(ABC):
         else:
             ax.set_ylim(bottom=ylim[0], top=ylim[1])
 
-    def _add_legend(self, ax: list[plt.Axes] | plt.Axes) -> None:
-        """Addition of legend with respect to number of labels."""
+    def _add_legend(self, ax: list[plt.Axes] | plt.Axes, *, use_column_sizes: bool = True) -> None:
+        """Addition of legend with respect to number of labels.
+
+        :param ax: Axes (or list of axes) whose labelled artists form the legend.
+        :param use_column_sizes: If False, ignore ``legend_column_sizes`` and lay out automatically.
+        """
         if not isinstance(ax, list):
             ax = [ax]
         lines, labels = [], []
@@ -502,12 +511,12 @@ class BasePlotter(ABC):
         if labels:
             n = len(labels)
             cap = self.legend_max_rows
-            sizes = self.legend_column_sizes
+            sizes = self.legend_column_sizes if use_column_sizes else None
             counts: list[int] | None
             if sizes is not None:
                 if sum(sizes) != n:
                     raise ValueError(
-                        f"legend_column_sizes {sizes} sum to {sum(sizes)}, but there are {n} legend entries"
+                        f"legend_column_sizes {sizes} sum to {sum(sizes)}, but there are {n} legend entries on this axes"
                     )
                 counts = list(sizes)
                 ncol = len(counts)

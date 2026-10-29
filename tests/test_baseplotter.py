@@ -199,7 +199,7 @@ def test_legend_column_sizes_mismatch_raises():
     fig, ax = plt.subplots()
     for i in range(7):
         ax.plot([0, 1], [i, i], label=f"entry {i}")
-    with pytest.raises(ValueError, match="7"):
+    with pytest.raises(ValueError, match=r"sum to 6.*7 legend entries"):
         plotter._add_legend(ax=ax)
     plt.close(fig)
 
@@ -213,7 +213,7 @@ def test_legend_column_sizes_no_labels_no_error():
     plt.close(fig)
 
 
-@pytest.mark.parametrize("bad", [[], [2, 0], [3, -1]])
+@pytest.mark.parametrize("bad", [[], [2, 0], [3, -1], [2.0, 4], [True, 5]])
 def test_legend_column_sizes_rejects_invalid(bad):
     with pytest.raises(ValueError):
         ConcretePlotter().legend_column_sizes = bad
@@ -239,6 +239,16 @@ def test_legend_column_sizes_setter_copies():
     plotter.legend_column_sizes = sizes
     sizes.append(1)
     assert plotter.legend_column_sizes == [2, 4]
+    plotter.legend_column_sizes.append(0)  # mutating the returned list must not leak back
+    assert plotter.legend_column_sizes == [2, 4]
+
+
+def test_legend_column_sizes_accepts_numpy_integers():
+    plotter = ConcretePlotter()
+    plotter.legend_column_sizes = np.array([2, 4])
+    sizes = plotter.legend_column_sizes
+    assert sizes == [2, 4]
+    assert all(type(s) is int for s in sizes)
 
 
 def test_legend_fills_columns_across_multiple_axes():

@@ -700,3 +700,41 @@ def test_loaded_histogram_2d_plotter_renders(tmp_path):
     ax = loaded.plot(save=False)
     assert ax.get_xlabel() == "mass"
     plt.close("all")
+
+
+def test_legend_column_sizes_apply_to_main_legend_not_pull_panel():
+    rng = np.random.default_rng(1)
+    hist = Histogram()
+    hist.binning = np.linspace(0, 10, 21)
+    for i in range(5):
+        hist.add_entry(HistogramEntry(name=f"b{i}", latex_name=f"B{i}", array=rng.uniform(0, 10, 200)))
+    data = Histogram()
+    data.binning = hist.binning
+    data.add_entry(HistogramEntry(name="data", latex_name="Data", array=rng.uniform(0, 10, 1000)))
+    hp = HistogramPlot(hist)
+    hp.stacked = True
+    hp.data_hist = data
+
+    def build():
+        plotter = HistogramPlotter(hp, HistogramVariable("x", "GeV"))
+        plotter.add_pull_data()
+        return plotter
+
+    ax, _ = build().plot(save=False)
+    n = len(ax.get_legend_handles_labels()[1])
+    plt.close("all")
+    assert n > 2
+
+    plotter = build()
+    plotter.legend_column_sizes = [2, n - 2]
+    ax, _ = plotter.plot(save=False)  # must not raise on the pull panel's single-entry legend
+    fig = ax.figure
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    columns: dict[int, int] = {}
+    for text in ax.get_legend().get_texts():
+        if text.get_text():
+            key = round(text.get_window_extent(renderer).x0 / 5)
+            columns[key] = columns.get(key, 0) + 1
+    plt.close("all")
+    assert [columns[k] for k in sorted(columns)] == [2, n - 2]
