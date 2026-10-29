@@ -212,6 +212,8 @@ BASE_PLOTTER_FIELDS = (
     "legend_max_rows",
     "legend_title",
     "legend_loc",
+    "legend_short_column",
+    "legend_column_sizes",
     "xlim",
     "ylim",
     "savedir",
