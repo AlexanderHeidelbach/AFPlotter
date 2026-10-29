@@ -892,7 +892,7 @@ class HistogramPlotter(BasePlotter):
             for generic_plot in self.pull_plots:
                 generic_plot.ax = ax_diff
                 _ = generic_plot.plot()
-            self._add_legend(ax=ax_diff)
+            self._add_legend(ax=ax_diff, use_column_sizes=False)
 
         self._add_axislabels(xax=(ax if ax_diff is None else ax_diff), yax=ax)
 

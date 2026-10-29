@@ -1,9 +1,11 @@
 from typing import Any
+import numbers
 import os
 import numpy as np
 from abc import ABC
 from cycler import cycler
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 from afplotter.experiments.context import get_experiment
 from afplotter.palettes import get_palette
@@ -101,6 +103,8 @@ class BasePlotter(ABC):
         self._log: bool = False
         self._xlog: bool = False
         self._legend_max_rows: int = 4
+        self._legend_short_column: str = "last"
+        self._legend_column_sizes: list[int] | None = None
         self._legend_title: str | None = None
         self._legend_loc: str = "best"
         self._xlim: tuple[float, float] | None = None
@@ -182,7 +186,10 @@ class BasePlotter(ABC):
         ``ncol = ceil(len(labels) / legend_max_rows)``. Raising this value
         therefore produces *fewer*, taller columns; lowering it produces more,
         shorter ones. To force a single column, set it to at least the number
-        of legend entries.
+        of legend entries. Columns are filled top-down to this cap; only the
+        last column is shorter (matplotlib alone would spread entries evenly);
+        see ``legend_short_column`` to move or spread the short column and
+        ``legend_column_sizes`` to set every column's size explicitly.
 
         :return: The per-column row cap. Defaults to 4.
         """
@@ -196,6 +203,62 @@ class BasePlotter(ABC):
             validated here; 0 raises ZeroDivisionError when the legend is drawn.
         """
         self._legend_max_rows = legend_max_rows
+
+    @property
+    def legend_short_column(self) -> str:
+        """Where the short column goes when entries do not fill the legend grid.
+
+        ``"last"`` fills columns to ``legend_max_rows`` and leaves the last one short,
+        ``"first"`` leaves the first one short, ``"balanced"`` lets matplotlib spread
+        entries as evenly as possible (no placeholders). Ignored when
+        ``legend_column_sizes`` is set.
+
+        :return: One of ``"last"``, ``"first"``, ``"balanced"``. Defaults to ``"last"``.
+        """
+        return self._legend_short_column
+
+    @legend_short_column.setter
+    def legend_short_column(self, legend_short_column: str) -> None:
+        """Set the short-column mode.
+
+        :param legend_short_column: One of ``"last"``, ``"first"``, ``"balanced"``.
+        :raises ValueError: If the value is not an allowed mode.
+        """
+        allowed = ("last", "first", "balanced")
+        if legend_short_column not in allowed:
+            raise ValueError(f"legend_short_column must be one of {allowed}, got {legend_short_column!r}")
+        self._legend_short_column = legend_short_column
+
+    @property
+    def legend_column_sizes(self) -> list[int] | None:
+        """Explicit number of entries in each legend column, left to right.
+
+        When set, it wins over ``legend_max_rows`` and ``legend_short_column``: the column
+        count is ``len(sizes)`` and entries are assigned in order. The sizes must sum to
+        the number of legend entries, otherwise drawing the legend raises ``ValueError``.
+
+        :return: A copy of the column sizes (mutating it does not affect the plotter), or None for automatic layout.
+        """
+        return None if self._legend_column_sizes is None else list(self._legend_column_sizes)
+
+    @legend_column_sizes.setter
+    def legend_column_sizes(self, legend_column_sizes: list[int] | None) -> None:
+        """Set the explicit column sizes.
+
+        :param legend_column_sizes: Positive column sizes, or None for automatic layout. Stored as a copy.
+        :raises ValueError: If the list is empty or any size is not an integer >= 1.
+        """
+        if legend_column_sizes is None:
+            self._legend_column_sizes = None
+            return
+        sizes = list(legend_column_sizes)
+        if (
+            not sizes
+            or not all(isinstance(size, numbers.Integral) and not isinstance(size, bool) for size in sizes)
+            or any(size < 1 for size in sizes)
+        ):
+            raise ValueError(f"legend_column_sizes must be a non-empty list of integers >= 1, got {sizes!r}")
+        self._legend_column_sizes = [int(size) for size in sizes]
 
     @property
     def legend_title(self) -> str | None:
@@ -431,8 +494,12 @@ class BasePlotter(ABC):
         else:
             ax.set_ylim(bottom=ylim[0], top=ylim[1])
 
-    def _add_legend(self, ax: list[plt.Axes] | plt.Axes) -> None:
-        """Addition of legend with respect to number of labels."""
+    def _add_legend(self, ax: list[plt.Axes] | plt.Axes, *, use_column_sizes: bool = True) -> None:
+        """Addition of legend with respect to number of labels.
+
+        :param ax: Axes (or list of axes) whose labelled artists form the legend.
+        :param use_column_sizes: If False, ignore ``legend_column_sizes`` and lay out automatically.
+        """
         if not isinstance(ax, list):
             ax = [ax]
         lines, labels = [], []
@@ -442,7 +509,38 @@ class BasePlotter(ABC):
             labels.extend(label)
 
         if labels:
-            ncol = len(labels) // self.legend_max_rows + (1 if len(labels) % self.legend_max_rows != 0 else 0)
+            n = len(labels)
+            cap = self.legend_max_rows
+            sizes = self.legend_column_sizes if use_column_sizes else None
+            counts: list[int] | None
+            if sizes is not None:
+                if sum(sizes) != n:
+                    raise ValueError(
+                        f"legend_column_sizes {sizes} sum to {sum(sizes)}, but there are {n} legend entries on this axes"
+                    )
+                counts = list(sizes)
+                ncol = len(counts)
+            else:
+                ncol = n // cap + (1 if n % cap != 0 else 0)
+                counts = None
+                if self.legend_short_column != "balanced":
+                    counts = [cap] * (ncol - 1) + [n - cap * (ncol - 1)]
+                    if self.legend_short_column == "first":
+                        counts.reverse()
+            if counts is not None and len(set(counts)) > 1:
+                # matplotlib splits entries evenly across columns; pad each column with invisible
+                # placeholders to a full rectangular grid so the columns come out as requested.
+                height = max(counts)
+                padded_lines, padded_labels = [], []
+                start = 0
+                for count in counts:
+                    padded_lines.extend(lines[start : start + count])
+                    padded_labels.extend(labels[start : start + count])
+                    for _ in range(height - count):
+                        padded_lines.append(Line2D([], [], linestyle="none", marker=""))
+                        padded_labels.append("")
+                    start += count
+                lines, labels = padded_lines, padded_labels
             legend_kwargs: dict[str, Any] = {
                 "ncol": ncol,
                 "title": self.legend_title,

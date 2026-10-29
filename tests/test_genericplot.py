@@ -150,6 +150,8 @@ def test_generic_plotter_save_load_round_trips_the_base_block(tmp_path):
     plotter.legend_max_rows = 7
     plotter.legend_title = "samples"
     plotter.legend_loc = "upper right"
+    plotter.legend_short_column = "first"
+    plotter.legend_column_sizes = [2, 4]
     plotter.xlim = (0.5, 9.5)
     plotter.ylim = (1.0, 1e4)
     plotter.savedir = "/tmp/plots"
@@ -177,6 +179,9 @@ def test_generic_plotter_save_load_round_trips_the_base_block(tmp_path):
     assert loaded.legend_max_rows == 7
     assert loaded.legend_title == "samples"
     assert loaded.legend_loc == "upper right"
+    assert loaded.legend_short_column == "first"
+    assert loaded.legend_column_sizes == [2, 4]
+    assert isinstance(loaded.legend_column_sizes, list)
     assert loaded.xlim == (0.5, 9.5)
     assert isinstance(loaded.xlim, tuple)
     assert loaded.ylim == (1.0, 1e4)
@@ -188,6 +193,25 @@ def test_generic_plotter_save_load_round_trips_the_base_block(tmp_path):
     assert isinstance(loaded.watermark_position, tuple)
     assert loaded.text == ["a note"]
     assert loaded.generic_text == [{"s": "x", "x": 0.1, "y": 0.2}]
+
+
+def test_save_load_without_legend_layout_keys_uses_defaults(tmp_path):
+    """Files written before the legend layout options existed must load with the defaults."""
+    plotter = GenericPlotter()
+    plotter.legend_short_column = "first"
+    plotter.legend_column_sizes = [2, 4]
+    path = tmp_path / "p.json"
+    plotter.save(path)
+
+    data = json.loads(path.read_text())
+    assert "legend_short_column" in data["base"]
+    del data["base"]["legend_short_column"]
+    del data["base"]["legend_column_sizes"]
+    path.write_text(json.dumps(data))
+
+    loaded = GenericPlotter.load(path)
+    assert loaded.legend_short_column == "last"
+    assert loaded.legend_column_sizes is None
 
 
 def test_generic_plotter_save_load_round_trips_plots_and_insets(tmp_path):
