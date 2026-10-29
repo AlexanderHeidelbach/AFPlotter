@@ -56,9 +56,13 @@ def test_legend_max_rows_caps_rows_and_grows_columns():
     assert _legend_column_count(max_rows=6, n_labels=6) == 1
 
 
-def _build_legend_axes(max_rows, n_labels):
+def _build_legend_axes(max_rows, n_labels, short_column=None, column_sizes=None):
     plotter = ConcretePlotter()
     plotter.legend_max_rows = max_rows
+    if short_column is not None:
+        plotter.legend_short_column = short_column
+    if column_sizes is not None:
+        plotter.legend_column_sizes = column_sizes
     fig, ax = plt.subplots()
     for i in range(n_labels):
         ax.plot([0, 1], [i, i], label=f"entry {i}")
@@ -77,9 +81,9 @@ def _group_by_column(fig, legend):
     return [columns[x] for x in sorted(columns)]
 
 
-def _legend_columns(max_rows, n_labels):
+def _legend_columns(max_rows, n_labels, short_column=None, column_sizes=None):
     """Return the real (non-empty) legend labels grouped by column, left to right."""
-    _, fig, ax = _build_legend_axes(max_rows, n_labels)
+    _, fig, ax = _build_legend_axes(max_rows, n_labels, short_column, column_sizes)
     cols = _group_by_column(fig, ax.get_legend())
     plt.close(fig)
     return cols
@@ -113,6 +117,128 @@ def test_legend_placeholders_are_invisible():
         assert handle.get_linestyle() == "None"
         assert handle.get_marker() in ("", "None", None)
     plt.close(fig)
+
+
+def test_legend_short_column_defaults_to_last():
+    assert ConcretePlotter().legend_short_column == "last"
+    assert ConcretePlotter().legend_column_sizes is None
+
+
+def test_legend_short_column_first():
+    cols = _legend_columns(max_rows=4, n_labels=6, short_column="first")
+    assert cols == [["entry 0", "entry 1"], [f"entry {i}" for i in range(2, 6)]]
+    assert [len(c) for c in _legend_columns(max_rows=4, n_labels=9, short_column="first")] == [1, 4, 4]
+
+
+def test_legend_short_column_first_keeps_entries_at_top():
+    _, fig, ax = _build_legend_axes(max_rows=4, n_labels=6, short_column="first")
+    legend = ax.get_legend()
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    first_col = [
+        t
+        for t in legend.get_texts()
+        if round(t.get_window_extent(renderer).x0 / 5)
+        == min(round(u.get_window_extent(renderer).x0 / 5) for u in legend.get_texts())
+    ]
+    assert len(first_col) == 4
+    real = [t.get_window_extent(renderer).y0 for t in first_col if t.get_text()]
+    pads = [t.get_window_extent(renderer).y0 for t in first_col if not t.get_text()]
+    assert len(real) == 2 and len(pads) == 2
+    assert min(real) > max(pads)
+    plt.close(fig)
+
+
+def test_legend_short_column_first_even_split_has_no_padding():
+    _, fig, ax = _build_legend_axes(max_rows=4, n_labels=8, short_column="first")
+    assert len(ax.get_legend().get_texts()) == 8
+    plt.close(fig)
+
+
+@pytest.mark.parametrize("mode", ["first", "balanced"])
+def test_legend_short_column_single_column_not_padded(mode):
+    _, fig, ax = _build_legend_axes(max_rows=4, n_labels=3, short_column=mode)
+    assert len(ax.get_legend().get_texts()) == 3
+    plt.close(fig)
+
+
+def test_legend_short_column_balanced():
+    _, fig, ax = _build_legend_axes(max_rows=4, n_labels=6, short_column="balanced")
+    assert len(ax.get_legend().get_texts()) == 6
+    cols = _group_by_column(fig, ax.get_legend())
+    plt.close(fig)
+    assert [len(c) for c in cols] == [3, 3]
+
+
+def test_legend_short_column_rejects_unknown():
+    with pytest.raises(ValueError, match="first"):
+        ConcretePlotter().legend_short_column = "middle"
+
+
+def test_legend_column_sizes_explicit():
+    cols = _legend_columns(max_rows=4, n_labels=6, column_sizes=[3, 1, 2])
+    assert cols == [["entry 0", "entry 1", "entry 2"], ["entry 3"], ["entry 4", "entry 5"]]
+
+
+def test_legend_column_sizes_override_short_column():
+    cols = _legend_columns(max_rows=4, n_labels=6, short_column="balanced", column_sizes=[2, 4])
+    assert [len(c) for c in cols] == [2, 4]
+
+
+def test_legend_column_sizes_single_column():
+    _, fig, ax = _build_legend_axes(max_rows=4, n_labels=6, column_sizes=[6])
+    assert len(ax.get_legend().get_texts()) == 6
+    cols = _group_by_column(fig, ax.get_legend())
+    plt.close(fig)
+    assert [len(c) for c in cols] == [6]
+
+
+def test_legend_column_sizes_mismatch_raises():
+    plotter = ConcretePlotter()
+    plotter.legend_column_sizes = [2, 4]
+    fig, ax = plt.subplots()
+    for i in range(7):
+        ax.plot([0, 1], [i, i], label=f"entry {i}")
+    with pytest.raises(ValueError, match="7"):
+        plotter._add_legend(ax=ax)
+    plt.close(fig)
+
+
+def test_legend_column_sizes_no_labels_no_error():
+    plotter = ConcretePlotter()
+    plotter.legend_column_sizes = [2, 4]
+    fig, ax = plt.subplots()
+    plotter._add_legend(ax=ax)
+    assert ax.get_legend() is None
+    plt.close(fig)
+
+
+@pytest.mark.parametrize("bad", [[], [2, 0], [3, -1]])
+def test_legend_column_sizes_rejects_invalid(bad):
+    with pytest.raises(ValueError):
+        ConcretePlotter().legend_column_sizes = bad
+
+
+def test_legend_column_sizes_none_restores_auto():
+    plotter = ConcretePlotter()
+    plotter.legend_max_rows = 4
+    plotter.legend_column_sizes = [3, 3]
+    plotter.legend_column_sizes = None
+    fig, ax = plt.subplots()
+    for i in range(6):
+        ax.plot([0, 1], [i, i], label=f"entry {i}")
+    plotter._add_legend(ax=ax)
+    cols = _group_by_column(fig, ax.get_legend())
+    plt.close(fig)
+    assert [len(c) for c in cols] == [4, 2]
+
+
+def test_legend_column_sizes_setter_copies():
+    plotter = ConcretePlotter()
+    sizes = [2, 4]
+    plotter.legend_column_sizes = sizes
+    sizes.append(1)
+    assert plotter.legend_column_sizes == [2, 4]
 
 
 def test_legend_fills_columns_across_multiple_axes():
